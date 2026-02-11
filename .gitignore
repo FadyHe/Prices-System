@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# Puppeteer
+/node_modules/puppeteer/.local-chromium
+
+# chrome
+chrome
