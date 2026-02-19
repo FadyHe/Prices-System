@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { normalizeProductName } from "@/lib/search/normalize";
+import { scoreProduct } from "@/lib/search/score";
 
 interface Product {
   name: string;
@@ -15,33 +17,54 @@ interface Product {
 const PLACEHOLDER = 'https://via.placeholder.com/200x200?text=No+Image';
 
 export default function ScraperTest() {
-  const [query, setQuery] = useState('');
-  const [products, setProducts] = useState<Product[]>([]);
+  const [scrapeQuery, setScrapeQuery] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Filter scraped products using relevance scoring
+  const filteredProducts = useMemo(() => {
+    if (scrapedProducts.length === 0) return [];
+    if (!filterQuery.trim()) return scrapedProducts;
+
+    const { tokens: queryTokens } = normalizeProductName(filterQuery);
+    if (queryTokens.length === 0) return scrapedProducts;
+
+    const scored = scrapedProducts.map((p) => {
+      const { tokens: productTokens } = normalizeProductName(p.name);
+      const score = scoreProduct(productTokens, queryTokens);
+      const relevance = score / queryTokens.length;
+      return { ...p, score, relevance };
+    });
+
+    const minRelevance = 0.5;
+    return scored
+      .filter((p) => p.score > 0 && p.relevance >= minRelevance)
+      .sort((a, b) => a.price - b.price);
+  }, [scrapedProducts, filterQuery]);
+
+  const handleScrape = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!scrapeQuery.trim()) return;
 
     setLoading(true);
     setError('');
-    setProducts([]);
+    setScrapedProducts([]);
+    setFilterQuery('');
 
     try {
       const res = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ query: scrapeQuery.trim() }),
       });
 
       if (!res.ok) throw new Error('API error');
 
       const data = await res.json();
-      const sorted = (data.products as Product[])
-        .sort((a, b) => a.price - b.price);
-
-      setProducts(sorted);
+      const sorted = (data.products as Product[]).sort((a, b) => a.price - b.price);
+      setScrapedProducts(sorted);
     } catch (err) {
       setError('Failed to fetch results. Check console + API.');
     } finally {
@@ -56,23 +79,41 @@ export default function ScraperTest() {
           مقارنة الأسعار
         </h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto mb-12">
+        {/* Scrape search bar */}
+        <form onSubmit={handleScrape} className="flex flex-col sm:flex-row gap-4 max-w-2xl mx-auto mb-6">
           <input
             type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={scrapeQuery}
+            onChange={(e) => setScrapeQuery(e.target.value)}
             placeholder="ابحث عن منتج (مثل جالكسي اس 24)"
             className="flex-1 text-black px-6 py-4 text-lg rounded-xl border border-gray-300 focus:outline-none focus:ring-4 focus:ring-blue-500 shadow-sm text-right"
             disabled={loading}
           />
           <button
             type="submit"
-            disabled={loading || !query.trim()}
+            disabled={loading || !scrapeQuery.trim()}
             className="px-8 py-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg transition"
           >
             {loading ? 'جاري البحث...' : 'بحث'}
           </button>
         </form>
+
+        {/* Filter search bar - only shows after scraping */}
+        {scrapedProducts.length > 0 && (
+          <div className="max-w-2xl mx-auto mb-8">
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="فلتر النتائج..."
+              className="w-full text-black px-6 py-3 text-base rounded-xl border border-gray-300 focus:outline-none focus:ring-4 focus:ring-green-500 shadow-sm text-right"
+              dir="rtl"
+            />
+            <p className="text-center text-gray-500 text-sm mt-2">
+              عرض {filteredProducts.length} من أصل {scrapedProducts.length} منتج
+            </p>
+          </div>
+        )}
 
         {error && <p className="text-center text-red-600 text-lg mb-8">{error}</p>}
 
@@ -82,10 +123,9 @@ export default function ScraperTest() {
           </div>
         )}
 
-        {products.length > 0 && (
-          
+        {filteredProducts.length > 0 && (
           <ul className="space-y-6">
-            {products.map((p, i) => (
+            {filteredProducts.map((p, i) => (
               <li key={i} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition p-6 flex gap-8 items-start">
                 <img
                   src={p.image || PLACEHOLDER}
@@ -120,10 +160,9 @@ export default function ScraperTest() {
             ))}
           </ul>
         )}
-        console.log(products);
-        {!loading && products.length === 0 && query && !error && (
+        {!loading && scrapedProducts.length > 0 && filteredProducts.length === 0 && (
           <p className="text-center text-gray-600 text-lg mt-20">
-            لا توجد نتائج. تحقق من الـ selectors إذا لزم الأمر.
+            لا توجد نتائج مطابقة للفلتر.
           </p>
         )}
       </div>
