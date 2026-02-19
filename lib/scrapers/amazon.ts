@@ -1,5 +1,6 @@
 import { Page } from 'puppeteer';
 import { Product } from '../types';
+import path from 'path';
 
 async function autoScroll(page: Page) {
   await page.evaluate(async () => {
@@ -20,196 +21,194 @@ async function autoScroll(page: Page) {
   });
 }
 
+/** Check if Amazon returned a CAPTCHA page instead of results */
+async function isCaptchaPage(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    return !!(
+      document.querySelector('#captchacharacters') ||
+      document.querySelector('form[action*="validateCaptcha"]') ||
+      document.querySelector('input#captchacharacters') ||
+      document.title.toLowerCase().includes('robot check') ||
+      document.title.toLowerCase().includes('sorry')
+    );
+  });
+}
+
+/** Small random delay to appear more human */
+function randomDelay(min = 2000, max = 4000): Promise<void> {
+  const ms = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function scrapeAmazon(
   page: Page,
   query: string,
   maxProducts = 15
 ): Promise<Product[]> {
 
-  const url = `https://www.amazon.eg/s?k=${encodeURIComponent(query)}`;
-  console.log('[Amazon] Navigating to:', url);
+  const allProducts: Product[] = [];
+  const maxPages = 3;
 
-  try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
-    console.log('[Amazon] Page loaded');
-  } catch (err) {
-    console.error('[Amazon] Navigation failed:', err);
-    throw err;
-  }
+  for (let currentPage = 1; currentPage <= maxPages; currentPage++) {
+    if (allProducts.length >= maxProducts) break;
 
-  // Wait for product results with multiple selector attempts
-  const selectors = [
-    'div[data-component-type="s-search-result"]',
-    'div.s-result-item',
-    'div[data-asin]',
-    '.s-main-slot .s-result-item'
-  ];
+    const url =
+      `https://www.amazon.eg/s?k=${encodeURIComponent(query)}&page=${currentPage}`;
 
-  let selectorFound = false;
-  for (const selector of selectors) {
+    console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
+
     try {
-      await page.waitForSelector(selector, { timeout: 10000 });
-      console.log(`[Amazon] Found products with selector: ${selector}`);
-      selectorFound = true;
-      break;
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+      console.log(`[Amazon] Page ${currentPage} loaded`);
     } catch (err) {
-      console.log(`[Amazon] Selector ${selector} not found, trying next...`);
-    }
-  }
-
-  if (!selectorFound) {
-    console.error('[Amazon] No product selectors found on page');
-    return [];
-  }
-
-  await autoScroll(page);
-  await new Promise(r => setTimeout(r, 2000));
-
-  const products = await page.evaluate((max) => {
-    // Helper function to convert Arabic numerals to Western numerals
-    function convertArabicToWestern(str: string): string {
-      const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-      const westernNumerals = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-      
-      let result = str;
-      for (let i = 0; i < arabicNumerals.length; i++) {
-        result = result.split(arabicNumerals[i]).join(westernNumerals[i]);
-      }
-      return result;
+      console.error('[Amazon] Navigation failed:', err);
+      break;
     }
 
-    // Helper function to extract and clean price
-    function extractPrice(priceText: string): number {
-      if (!priceText) return 0;
-      
-      // Convert Arabic numerals to Western
-      let cleaned = convertArabicToWestern(priceText);
-      
-      // Remove currency symbols and text
-      cleaned = cleaned.replace(/EGP|ج\.م\.|جنيه|LE/gi, '').trim();
-      
-      // Remove all non-numeric characters except dots and commas
-      cleaned = cleaned.replace(/[^\d.,]/g, '');
-      
-      // Remove commas (thousand separators)
-      cleaned = cleaned.replace(/,/g, '');
-      
-      // Handle multiple dots
-      const parts = cleaned.split('.');
-      if (parts.length > 2) {
-        cleaned = parts[0] + '.' + parts.slice(1).join('');
-      }
-      
-      // Parse the number
-      const price = parseFloat(cleaned);
-      
-      // Sanity check
-      if (price > 0 && price < 1000000) {
-        return price;
-      }
-      
-      return 0;
+    // --- CAPTCHA detection ---
+    const captcha = await isCaptchaPage(page);
+    if (captcha) {
+      const title = await page.title();
+      console.warn(`[Amazon] ⚠️ CAPTCHA detected! Page title: "${title}"`);
+      console.warn('[Amazon] Amazon is blocking the scraper. Try running with headless:false and solving the CAPTCHA once.');
+
+      // Save a debug screenshot
+      try {
+        const ssPath = path.join(process.cwd(), `amazon-captcha-debug-${Date.now()}.png`);
+        await page.screenshot({ path: ssPath, fullPage: true });
+        console.log(`[Amazon] Debug screenshot saved: ${ssPath}`);
+      } catch {}
+
+      break;
     }
 
-    const results: any[] = [];
-    
-    // Try multiple selector patterns for products
-    const itemSelectors = [
+    // --- Wait for product cards ---
+    const selectors = [
       'div[data-component-type="s-search-result"]',
-      'div.s-result-item[data-asin]:not([data-asin=""])',
+      'div.s-result-item',
       'div[data-asin]',
       '.s-main-slot .s-result-item'
     ];
-    
-    let items: Element[] = [];
-    for (const selector of itemSelectors) {
-      const found = Array.from(document.querySelectorAll(selector));
-      if (found.length > 0) {
-        items = found;
-        console.log(`Using selector: ${selector}, found ${found.length} items`);
+
+    let selectorFound = false;
+    for (const selector of selectors) {
+      try {
+        await page.waitForSelector(selector, { timeout: 10000 });
+        selectorFound = true;
         break;
-      }
+      } catch {}
     }
 
-    for (const item of items) {
-      if (results.length >= max) break;
+    if (!selectorFound) {
+      const title = await page.title();
+      console.warn(`[Amazon] No product selectors found. Page title: "${title}". Stopping.`);
 
+      // Save debug screenshot when no products found
       try {
-        // Try multiple name selectors
-        const nameSelectors = ['h2 a span', 'h2 span', '.a-text-normal', 'h2'];
-        let name = '';
-        for (const sel of nameSelectors) {
-          const el = item.querySelector(sel);
-          if (el?.textContent?.trim()) {
-            name = el.textContent.trim();
-            break;
-          }
-        }
+        const ssPath = path.join(process.cwd(), `amazon-empty-debug-${Date.now()}.png`);
+        await page.screenshot({ path: ssPath, fullPage: true });
+        console.log(`[Amazon] Debug screenshot saved: ${ssPath}`);
+      } catch {}
 
-        // Try multiple link selectors
-        const linkSelectors = ['h2 a', 'a.a-link-normal', 'a'];
-        let url = '';
-        for (const sel of linkSelectors) {
-          const el = item.querySelector(sel);
-          const href = el?.getAttribute('href');
-          if (href && href.includes('/dp/')) {
-            url = href.startsWith('http') ? href : 'https://www.amazon.eg' + href.split('/ref=')[0];
-            break;
-          }
-        }
+      break;
+    }
 
-        // Try multiple price selectors with improved extraction
-        const priceSelectors = [
-          '.a-price span.a-offscreen',
-          '.a-price .a-price-whole',
-          'span.a-price-whole',
-          '.a-price',
-          'span[data-a-color="price"]'
-        ];
-        let price = 0;
-        for (const sel of priceSelectors) {
-          const el = item.querySelector(sel);
-          const priceText = el?.textContent?.trim();
-          if (priceText) {
-            const extracted = extractPrice(priceText);
-            if (extracted > 0) {
-              price = extracted;
-              break;
-            }
-          }
-        }
+    await autoScroll(page);
+    await new Promise(r => setTimeout(r, 1500));
 
-        // Try multiple image selectors
-        const imgSelectors = ['img.s-image', 'img', '[data-image-source]'];
-        let image = '';
-        for (const sel of imgSelectors) {
-          const el = item.querySelector(sel);
-          const src = el?.getAttribute('src') || el?.getAttribute('data-src') || el?.getAttribute('data-image-source');
-          if (src && src.startsWith('http')) {
-            image = src;
-            break;
-          }
+    const products = await page.evaluate((max) => {
+      function convertArabicToWestern(str: string): string {
+        const a = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+        const w = ['0','1','2','3','4','5','6','7','8','9'];
+        let result = str;
+        for (let i = 0; i < a.length; i++) {
+          result = result.split(a[i]).join(w[i]);
         }
+        return result;
+      }
 
-        if (price > 0 && name && url) {
+      function extractPrice(priceText: string): number {
+        if (!priceText) return 0;
+        let cleaned = convertArabicToWestern(priceText);
+        cleaned = cleaned.replace(/EGP|ج\.م\.|جنيه|LE/gi, '');
+        cleaned = cleaned.replace(/[^\d.,]/g, '').replace(/,/g, '');
+        const parts = cleaned.split('.');
+        if (parts.length > 2) {
+          cleaned = parts[0] + '.' + parts.slice(1).join('');
+        }
+        const price = parseFloat(cleaned);
+        return price > 0 && price < 1_000_000 ? price : 0;
+      }
+
+      const results: any[] = [];
+      const items = Array.from(
+        document.querySelectorAll('div[data-asin]:not([data-asin=""])')
+      );
+
+      for (const item of items) {
+        if (results.length >= max) break;
+
+        // --- Name (broadened) ---
+        const nameEl =
+          item.querySelector('h2 a span') ||
+          item.querySelector('h2 span') ||
+          item.querySelector('.a-text-normal');
+
+        // --- Link (broadened) ---
+        const linkEl =
+          item.querySelector('h2 a') ||
+          item.querySelector('a.a-link-normal[href*="/dp/"]') ||
+          item.querySelector('a[href*="/dp/"]');
+
+        // --- Price (broadened) ---
+        const priceEl =
+          item.querySelector('.a-price span.a-offscreen') ||
+          item.querySelector('span.a-price-whole') ||
+          item.querySelector('span[data-a-color="price"] .a-offscreen') ||
+          item.querySelector('.a-color-price');
+
+        // --- Image ---
+        const imgEl =
+          item.querySelector('img.s-image') ||
+          item.querySelector('img[data-image-latency="s-product-image"]');
+
+        const name = nameEl?.textContent?.trim() || '';
+        const href = linkEl?.getAttribute('href') || '';
+        const priceText = priceEl?.textContent || '';
+        const image = imgEl?.getAttribute('src') || imgEl?.getAttribute('data-src') || '';
+
+        const price = extractPrice(priceText);
+
+        if (name && price > 0) {
+          const fullUrl = href
+            ? 'https://www.amazon.eg' + href.split('/ref=')[0]
+            : '';
+
           results.push({
             name,
             price,
             currency: 'EGP',
             seller: 'Amazon.eg',
-            url,
-            image: image || '',
+            url: fullUrl,
+            image,
             source: 'Amazon.eg'
           });
         }
-      } catch (err) {
-        console.error('Error parsing item:', err);
       }
+
+      return results;
+    }, maxProducts - allProducts.length);
+
+    console.log(`[Amazon] Page ${currentPage} extracted ${products.length}`);
+
+    allProducts.push(...products);
+
+    // Random delay between pages to reduce detection
+    if (currentPage < maxPages && allProducts.length < maxProducts) {
+      await randomDelay(2000, 4000);
     }
+  }
 
-    return results;
-  }, maxProducts);
-
-  console.log(`[Amazon] Extracted ${products.length} products`);
-  return products;
+  console.log(`[Amazon] Total products collected: ${allProducts.length}`);
+  return allProducts.slice(0, maxProducts);
 }
