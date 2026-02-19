@@ -4,6 +4,8 @@ import { scrapeAmazon } from '@/lib/scrapers/amazon';
 import { scrapeJumia } from '@/lib/scrapers/jumia';
 import { scrapeNoon } from '@/lib/scrapers/noon';
 import { scrapeGoogleShopping } from '@/lib/scrapers/googleShopping';
+import { normalizeProductName } from '@/lib/search/normalize';
+import { scoreProduct } from '@/lib/search/score';
 
 import type { Product } from '@/lib/types';
 
@@ -141,10 +143,27 @@ export async function POST(req: Request) {
     );
   }
 
-  const products = await scrapeAll(query.trim());
+  const raw = await scrapeAll(query.trim());
+
+  // --- Server-side relevance filtering ---
+  const { tokens: queryTokens } = normalizeProductName(query);
+  const MIN_RELEVANCE = 0.3;
+
+  const filtered = raw
+    .map((p) => {
+      const { tokens: pTokens } = normalizeProductName(p.name);
+      const score = scoreProduct(pTokens, queryTokens);
+      const relevance = queryTokens.length > 0 ? score / queryTokens.length : 0;
+      return { ...p, score, relevance };
+    })
+    .filter((p) => p.score > 0 && p.relevance >= MIN_RELEVANCE)
+    .sort((a, b) => a.price - b.price);
+
+  console.log(`🔍 Filter: ${raw.length} scraped → ${filtered.length} relevant (query tokens: [${queryTokens.join(', ')}])`);
 
   return Response.json({
-    count: products.length,
-    products,
+    totalScraped: raw.length,
+    count: filtered.length,
+    products: filtered,
   });
 }

@@ -1,76 +1,21 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { normalizeProductName } from "@/lib/search/normalize";
-import { scoreProduct } from "@/lib/search/score";
-
-interface Product {
-  name: string;
-  price: number;
-  currency: string;
-  seller: string;
-  url: string;
-  source: string;
-  image: string;
-}
+import { useScraper } from '@/components/useScraper';
 
 const PLACEHOLDER = 'https://via.placeholder.com/200x200?text=No+Image';
 
 export default function ScraperTest() {
-  const [scrapeQuery, setScrapeQuery] = useState('');
-  const [filterQuery, setFilterQuery] = useState('');
-  const [scrapedProducts, setScrapedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // Filter scraped products using relevance scoring
-  const filteredProducts = useMemo(() => {
-    if (scrapedProducts.length === 0) return [];
-    if (!filterQuery.trim()) return scrapedProducts;
-
-    const { tokens: queryTokens } = normalizeProductName(filterQuery);
-    if (queryTokens.length === 0) return scrapedProducts;
-
-    const scored = scrapedProducts.map((p) => {
-      const { tokens: productTokens } = normalizeProductName(p.name);
-      const score = scoreProduct(productTokens, queryTokens);
-      const relevance = score / queryTokens.length;
-      return { ...p, score, relevance };
-    });
-
-    const minRelevance = 0.5;
-    return scored
-      .filter((p) => p.score > 0 && p.relevance >= minRelevance)
-      .sort((a, b) => a.price - b.price);
-  }, [scrapedProducts, filterQuery]);
-
-  const handleScrape = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scrapeQuery.trim()) return;
-
-    setLoading(true);
-    setError('');
-    setScrapedProducts([]);
-    setFilterQuery('');
-
-    try {
-      const res = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: scrapeQuery.trim() }),
-      });
-
-      if (!res.ok) throw new Error('API error');
-
-      const data = await res.json();
-      const sorted = (data.products as Product[]).sort((a, b) => a.price - b.price);
-      setScrapedProducts(sorted);
-    } catch (err) {
-      setError('Failed to fetch results. Check console + API.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    scrapeQuery,
+    setScrapeQuery,
+    filterQuery,
+    setFilterQuery,
+    products,
+    filteredProducts,
+    loading,
+    error,
+    handleScrape,
+  } = useScraper();
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -98,8 +43,8 @@ export default function ScraperTest() {
           </button>
         </form>
 
-        {/* Filter search bar - only shows after scraping */}
-        {scrapedProducts.length > 0 && (
+        {/* Filter search bar */}
+        {products.length > 0 && (
           <div className="max-w-2xl mx-auto mb-8">
             <input
               type="text"
@@ -110,7 +55,7 @@ export default function ScraperTest() {
               dir="rtl"
             />
             <p className="text-center text-gray-500 text-sm mt-2">
-              عرض {filteredProducts.length} من أصل {scrapedProducts.length} منتج
+              عرض {filteredProducts.length} من أصل {products.length} منتج
             </p>
           </div>
         )}
@@ -160,7 +105,8 @@ export default function ScraperTest() {
             ))}
           </ul>
         )}
-        {!loading && scrapedProducts.length > 0 && filteredProducts.length === 0 && (
+
+        {!loading && products.length > 0 && filteredProducts.length === 0 && (
           <p className="text-center text-gray-600 text-lg mt-20">
             لا توجد نتائج مطابقة للفلتر.
           </p>

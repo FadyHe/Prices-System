@@ -6,8 +6,6 @@ export function normalizeProductName(name: string) {
 
   text = text.replace(/[^\u0600-\u06FFa-z0-9\s]/gi, " ");
 
-  text = text.replace(/\d+/g, " ");
-
   let tokens = text.split(/\s+/);
 
   tokens = tokens.filter(
