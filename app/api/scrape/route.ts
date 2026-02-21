@@ -116,13 +116,13 @@ async function scrapeAll(query: string): Promise<Product[]> {
     await randomDelay();
 
     // 4️⃣ Google Shopping
-    const google = await runScraper(
-      browser,
-      'Google Shopping',
-      scrapeGoogleShopping,
-      query
-    );
-    allProducts.push(...google);
+    // const google = await runScraper(
+    //   browser,
+    //   'Google Shopping',
+    //   scrapeGoogleShopping,
+    //   query
+    // );
+    // allProducts.push(...google);
 
   } finally {
     await browser.close();
