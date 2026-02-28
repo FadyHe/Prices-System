@@ -91,6 +91,7 @@
    ============================== */
 * {
   box-sizing: border-box;
+
 }
 
 html {
@@ -103,6 +104,8 @@ body {
   font-family: "Cairo", sans-serif;
   line-height: 1.6;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -146,6 +149,8 @@ body {
   transition: all var(--transition-base);
   text-decoration: none;
 }
+
+
 
 .btn-primary {
   background: var(--accent-gradient);
@@ -195,6 +200,7 @@ body {
   box-shadow: 0 0 25px rgba(139, 92, 246, 0.7);
   transform: translateY(-1px);
 }
+
 
 /* ==============================
    Inputs
@@ -402,4 +408,8 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+.hr {
+  @apply border-secondary/20 mt-5 opacity-50;
 }

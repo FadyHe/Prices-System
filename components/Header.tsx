@@ -24,6 +24,7 @@ function Header() {
         </div>
 
       </nav>
+      <hr className='hr'/>
     </header>
   )
 }

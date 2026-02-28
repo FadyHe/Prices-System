@@ -1,3 +1,4 @@
+import Footer from '@/components/Footer'
 import './globals.css'
 import Header from '@/components/Header'
 
@@ -15,7 +16,10 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body>
         <Header />
-        {children}
+        <main className="flex-1">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   )
