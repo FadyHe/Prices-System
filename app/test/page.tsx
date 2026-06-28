@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useScraper } from '@/components/useScraper';
 
 const PLACEHOLDER = 'https://via.placeholder.com/200x200?text=No+Image';
@@ -72,9 +73,12 @@ export default function ScraperTest() {
           <ul className="space-y-6">
             {filteredProducts.map((p, i) => (
               <li key={i} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition p-6 flex gap-8 items-start">
-                <img
+                <Image
                   src={p.image || PLACEHOLDER}
                   alt={p.name}
+                  width={160}
+                  height={160}
+                  unoptimized
                   className="w-40 h-40 object-contain rounded-lg bg-gray-100 flex-shrink-0"
                   onError={(e) => (e.currentTarget.src = PLACEHOLDER)}
                 />

@@ -27,7 +27,7 @@ async function applyStealth(page: Page) {
 
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    // @ts-ignore
+    // @ts-expect-error attaching chrome runtime shim for stealth
     window.chrome = { runtime: {} };
 
     Object.defineProperty(navigator, 'languages', {
@@ -73,7 +73,7 @@ async function runScraper(
 /* ================== MAIN SCRAPER ================== */
 async function scrapeAll(query: string): Promise<Product[]> {
   const browser = await puppeteer.launch({
-    headless: false, // خليه false وانت بتفهم اللي بيحصل
+    headless: true, // خليه false وانت بتفهم اللي بيحصل
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     timeout: 90_000,
   });

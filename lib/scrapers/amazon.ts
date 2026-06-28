@@ -140,7 +140,7 @@ export async function scrapeAmazon(
         return price > 0 && price < 1_000_000 ? price : 0;
       }
 
-      const results: any[] = [];
+      const results: Record<string, unknown>[] = [];
       const items = Array.from(
         document.querySelectorAll('div[data-asin]:not([data-asin=""])')
       );

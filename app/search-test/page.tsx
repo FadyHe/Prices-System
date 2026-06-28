@@ -1,9 +1,13 @@
 'use client';
 
+import Image from 'next/image';
 import { products } from "@/lib/products.js";
 import { useState, useMemo } from "react";
 import { normalizeProductName } from "@/lib/search/normalize";
 import { scoreProduct } from "@/lib/search/score";
+
+const PLACEHOLDER_IMG =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%231e293b'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Cairo,sans-serif' font-size='14' fill='%2364748b'>لا توجد صورة</text></svg>";
 
 function Page() {
   const [query, setQuery] = useState("");
@@ -52,11 +56,17 @@ function Page() {
           <ul className="space-y-6">
             {filteredProducts.map((p, i) => (
               <li key={i} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition p-6 flex gap-8 items-start">
-                <img
+                <Image
                   src={p.image}
                   alt={p.name}
+                  width={160}
+                  height={160}
+                  unoptimized
                   className="w-40 h-40 object-contain rounded-lg bg-gray-100 flex-shrink-0"
-                  onError={(e) => (e.currentTarget.src = p.image)}
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (img.src !== PLACEHOLDER_IMG) img.src = PLACEHOLDER_IMG;
+                  }}
                 />
                 <div className="flex-1">
                   <h3 className="text-2xl font-semibold text-gray-900 mb-3 line-clamp-2">

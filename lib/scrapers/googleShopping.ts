@@ -23,7 +23,7 @@ export async function scrapeGoogleShopping(
       document.querySelectorAll('div.sh-dgr__grid-result')
     );
 
-    const results: any[] = [];
+    const results: Record<string, unknown>[] = [];
 
     for (const card of cards) {
       if (results.length >= max) break;

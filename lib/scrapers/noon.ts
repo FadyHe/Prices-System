@@ -26,9 +26,6 @@ async function scrollAndWaitForProducts(page: Page, maxScrolls = 10) {
 
     // Scroll down in chunks
     await page.evaluate(async () => {
-      const scrollHeight = document.documentElement.scrollHeight;
-      const currentScroll = window.pageYOffset + window.innerHeight;
-      
       // Scroll down by viewport height
       window.scrollBy(0, window.innerHeight);
       
@@ -87,7 +84,7 @@ export async function scrapeNoon(
       console.log(`[Noon] Found products with selector: ${selector}`);
       selectorFound = true;
       break;
-    } catch (err) {
+    } catch {
       console.log(`[Noon] Selector ${selector} not found, trying next...`);
     }
   }
@@ -108,7 +105,7 @@ export async function scrapeNoon(
   await new Promise(r => setTimeout(r, 2000));
 
   const products = await page.evaluate((max) => {
-    const results: any[] = [];
+    const results: Record<string, unknown>[] = [];
     
     // Use the actual selector from the HTML
     const items = Array.from(document.querySelectorAll('[data-qa="plp-product-box"]'));
