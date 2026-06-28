@@ -28,9 +28,10 @@ function Footer() {
         <div>
           <h3 className="text-white font-bold mb-4">روابط سريعة</h3>
           <ul className="space-y-2 text-sm">
-            <li><Link className="hover:text-purple transition-colors" href="#">الرئيسية</Link></li>
-            <li><Link className="hover:text-purple transition-colors" href="/how-it-works">بيشتغل ازاي</Link></li>
-            <li><Link className="hover:text-purple transition-colors" href="/store">المتاجر</Link></li>
+            <li><Link className="hover:text-purple transition-colors" href="/">الرئيسية</Link></li>
+            <li><Link className="hover:text-purple transition-colors" href="/search">ابحث الآن</Link></li>
+            <li><Link className="hover:text-purple transition-colors" href="/history">سجل البحث</Link></li>
+            <li><Link className="hover:text-purple transition-colors" href="/#how-it-works">بيشتغل ازاي</Link></li>
           </ul>
         </div>
 
