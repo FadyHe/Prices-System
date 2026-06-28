@@ -4,17 +4,17 @@ import Link from 'next/link'
 function Header() {
   return (
     <header className='mt-5'>
-      <nav className='flex flex-row items-center justify-center gap-40 md:gap-40'>
+      <nav className='flex flex-row items-center justify-between gap-10 lg:justify-center lg:gap-40 px-6 md:px-10'>
         
         <Logo />
 
-        <div className='hidden md:flex flex-row items-center gap-12'>
-          <Link href="/" className="text-secondary hover:text-white transition-colors font-medium">الرئيسية</Link>
+        <div className='hidden md:flex flex-row items-center gap-12 md:whitespace-nowrap'>
+          <Link href="#hero" className="text-secondary hover:text-white transition-colors font-medium">الرئيسية</Link>
           <Link href="/how-it-works" className="text-secondary hover:text-white transition-colors font-medium">بيشتغل ازاي</Link>
           <Link href="/store" className="text-secondary hover:text-white transition-colors font-medium">المتاجر</Link>
         </div>
 
-        <div className='flex flex-row items-center gap-6'>
+        <div className='flex flex-row items-center gap-6 md:whitespace-nowrap'>
           <Link href="/login" className="hidden md:block text-secondary hover:text-white transition-colors text-sm font-medium">
             تسجيل الدخول
           </Link>

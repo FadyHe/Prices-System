@@ -3,7 +3,6 @@ import puppeteer, { Browser, Page } from 'puppeteer';
 import { scrapeAmazon } from '@/lib/scrapers/amazon';
 import { scrapeJumia } from '@/lib/scrapers/jumia';
 import { scrapeNoon } from '@/lib/scrapers/noon';
-import { scrapeGoogleShopping } from '@/lib/scrapers/googleShopping';
 import { normalizeProductName } from '@/lib/search/normalize';
 import { scoreProduct } from '@/lib/search/score';
 
