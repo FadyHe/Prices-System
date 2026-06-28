@@ -24,13 +24,32 @@ export async function connectDB(): Promise<typeof mongoose> {
       'MONGODB_URI is not set. Copy .env.local.example to .env.local and fill it in.'
     );
   }
-  if (cache.conn) return cache.conn;
-  if (!cache.promise) {
-    cache.promise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 10000,
-    });
+  if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
+    console.error('[mongodb] Invalid URI scheme. Starts with:', JSON.stringify(MONGODB_URI.slice(0, 40)));
+    throw new Error(
+      `Invalid MONGODB_URI scheme. Expected "mongodb://" or "mongodb+srv://", got: ${MONGODB_URI.slice(0, 40)}`
+    );
   }
-  cache.conn = await cache.promise;
-  return cache.conn;
+  try {
+    if (cache.conn) return cache.conn;
+    if (!cache.promise) {
+      cache.promise = mongoose.connect(MONGODB_URI, {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 10000,
+      });
+    }
+    cache.conn = await cache.promise;
+    return cache.conn;
+  } catch (err) {
+    const e = err as { name?: string; code?: string; message?: string; reason?: { message?: string; topologyDescription?: unknown } };
+    console.error('[mongodb] connect failed', {
+      name: e?.name,
+      code: e?.code,
+      message: e?.message,
+      reasonMessage: e?.reason?.message,
+      topologyDescription: e?.reason?.topologyDescription,
+    });
+    cache.promise = null;
+    throw err;
+  }
 }
