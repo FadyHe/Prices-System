@@ -77,5 +77,5 @@ export async function scrapeGoogleShopping(
     return results;
   }, maxProducts);
 
-  return products;
+  return products as unknown as Product[];
 }

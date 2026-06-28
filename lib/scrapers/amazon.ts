@@ -201,7 +201,7 @@ export async function scrapeAmazon(
 
     console.log(`[Amazon] Page ${currentPage} extracted ${products.length}`);
 
-    allProducts.push(...products);
+    allProducts.push(...(products as unknown as Product[]));
 
     // Random delay between pages to reduce detection
     if (currentPage < maxPages && allProducts.length < maxProducts) {

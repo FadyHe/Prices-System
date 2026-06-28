@@ -167,5 +167,5 @@ export async function scrapeNoon(
   }, maxProducts);
 
   console.log(`[Noon] Successfully extracted ${products.length} products`);
-  return products;
+  return products as unknown as Product[];
 }
