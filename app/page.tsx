@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Search, Percent, ShoppingBag, Zap, ShieldCheck, TrendingDown, ArrowLeft, Sparkles, Store } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -71,7 +72,9 @@ export default function Page() {
           </h2>
 
           <div className="w-full max-w-3xl mt-4">
-            <InputSys />
+            <Suspense fallback={null}>
+              <InputSys />
+            </Suspense>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2 mt-2 text-sm text-secondary">
