@@ -102,8 +102,8 @@ export function toHistoryResponse(
     query: doc.query,
     timestamp: new Date(doc.timestamp ?? Date.now()).getTime(),
     resultCount: doc.resultCount ?? 0,
-    bestPrice: doc.bestPrice,
-    bestSource: doc.bestSource,
+    bestPrice: doc.bestPrice ?? undefined,
+    bestSource: doc.bestSource ?? undefined,
     pinned: doc.pinned,
     savedProducts: (doc.savedProducts ?? []).map((p) => ({
       name: p.name,

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local-only tooling, not part of the app source
+    ".claude/**",
   ]),
 ]);
 

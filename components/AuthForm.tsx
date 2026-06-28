@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
   ChangeEvent,
   FormEvent,
-  useEffect,
   useState,
 } from 'react';
 import { ArrowLeft, Loader2, Lock, Mail, User as UserIcon } from 'lucide-react';
@@ -14,9 +13,6 @@ import { ArrowLeft, Loader2, Lock, Mail, User as UserIcon } from 'lucide-react';
 interface AuthFormProps {
   mode: 'login' | 'register';
 }
-
-const GOOGLE_ENABLED =
-  !!process.env.NEXT_PUBLIC_GOOGLE_ENABLED;
 
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
@@ -29,10 +25,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    setError('');
-  }, [mode]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

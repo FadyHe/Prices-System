@@ -75,7 +75,7 @@ function sameEntries(a: HistoryEntry[], b: HistoryEntry[]): boolean {
 }
 
 export function useSearchHistory() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const isAuthed = status === 'authenticated';
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -83,9 +83,8 @@ export function useSearchHistory() {
 
   // Hydrate from localStorage on first mount (works for both authed and guests)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from localStorage on client
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from an external system (localStorage)
     setEntries(readStore());
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from localStorage on client
     setHydrated(true);
 
     const onStorage = (e: StorageEvent) => {
