@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import type { Product } from '@/components/useScraper';
 
 export interface HistoryEntry {
@@ -15,6 +16,7 @@ export interface HistoryEntry {
 }
 
 const STORAGE_KEY = 'qarinha.history';
+const MERGED_FLAG_KEY = 'qarinha.merged';
 const MAX_ENTRIES = 50;
 
 function readStore(): HistoryEntry[] {
@@ -26,6 +28,15 @@ function readStore(): HistoryEntry[] {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+function writeStore(entries: HistoryEntry[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    /* ignore quota errors */
   }
 }
 
@@ -63,23 +74,18 @@ function sameEntries(a: HistoryEntry[], b: HistoryEntry[]): boolean {
   return true;
 }
 
-function writeStore(entries: HistoryEntry[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  } catch {
-    /* ignore quota errors */
-  }
-}
-
 export function useSearchHistory() {
+  const { data: session, status } = useSession();
+  const isAuthed = status === 'authenticated';
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const mergeInFlight = useRef(false);
 
+  // Hydrate from localStorage on first mount (works for both authed and guests)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from localStorage on client
     setEntries(readStore());
-     
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from localStorage on client
     setHydrated(true);
 
     const onStorage = (e: StorageEvent) => {
@@ -92,38 +98,100 @@ export function useSearchHistory() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const add = useCallback((entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
-    setEntries((prev) => {
-      const id = `${entry.query}-${Date.now()}`;
-      const next: HistoryEntry = {
-        id,
-        timestamp: Date.now(),
-        ...entry,
-      };
-      const deduped = prev.filter(
-        (p) => !(p.query.toLowerCase() === next.query.toLowerCase() && !p.pinned)
-      );
-      const merged = [next, ...deduped].slice(0, MAX_ENTRIES);
-      writeStore(merged);
-      return merged;
-    });
-  }, []);
+  // When user signs in: pull server history and merge any guest local entries
+  useEffect(() => {
+    if (!isAuthed || !hydrated || mergeInFlight.current) return;
+    mergeInFlight.current = true;
 
-  const remove = useCallback((id: string) => {
-    setEntries((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      writeStore(next);
-      return next;
-    });
-  }, []);
+    (async () => {
+      try {
+        const local = readStore();
+        const alreadyMerged =
+          window.localStorage.getItem(MERGED_FLAG_KEY) === '1';
 
-  const clear = useCallback(() => {
+        if (local.length > 0 && !alreadyMerged) {
+          await fetch('/api/history/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries: local }),
+          }).catch(() => null);
+          window.localStorage.setItem(MERGED_FLAG_KEY, '1');
+        }
+
+        const res = await fetch('/api/history', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.entries)) {
+            setEntries(data.entries);
+            writeStore(data.entries);
+          }
+        }
+      } finally {
+        mergeInFlight.current = false;
+      }
+    })();
+  }, [isAuthed, hydrated]);
+
+  // On sign-out, clear the merged flag so re-signing-in merges again if needed
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.localStorage.removeItem(MERGED_FLAG_KEY);
+    }
+  }, [status]);
+
+  const add = useCallback(
+    async (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
+      const localId = `${entry.query}-${Date.now()}`;
+      const ts = Date.now();
+      const next: HistoryEntry = { id: localId, timestamp: ts, ...entry };
+
+      setEntries((prev) => {
+        const deduped = prev.filter(
+          (p) => !(p.query.toLowerCase() === next.query.toLowerCase() && !p.pinned)
+        );
+        const merged = [next, ...deduped].slice(0, MAX_ENTRIES);
+        writeStore(merged);
+        return merged;
+      });
+
+      if (isAuthed) {
+        try {
+          await fetch('/api/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entry),
+          });
+        } catch {
+          /* best-effort sync */
+        }
+      }
+    },
+    [isAuthed]
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      setEntries((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        writeStore(next);
+        return next;
+      });
+      // Server uses ObjectId for entries fetched via /api/history; skip remote delete
+      // (the next GET refresh will reconcile). A dedicated DELETE-by-id route can be added later.
+    },
+    []
+  );
+
+  const clear = useCallback(async () => {
     setEntries((prev) => {
       const next = prev.filter((p) => p.pinned);
       writeStore(next);
       return next;
     });
-  }, []);
+    if (isAuthed) {
+      await fetch('/api/history', { method: 'DELETE' }).catch(() => null);
+    }
+  }, [isAuthed]);
 
   const togglePin = useCallback((id: string) => {
     setEntries((prev) => {
@@ -145,5 +213,14 @@ export function useSearchHistory() {
     });
   }, []);
 
-  return { entries, hydrated, add, remove, clear, togglePin, attachProducts };
+  return {
+    entries,
+    hydrated,
+    isAuthed,
+    add,
+    remove,
+    clear,
+    togglePin,
+    attachProducts,
+  };
 }

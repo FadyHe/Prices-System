@@ -18,6 +18,8 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import UserMenu from '@/components/UserMenu';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
@@ -87,11 +89,14 @@ function useKeyboardShortcut(handler: () => void, key: string) {
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const { data: session, status } = useSession();
   const { visible, scrolled } = useScrollDirection();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const isAuthed = status === 'authenticated' && !!session?.user;
 
   useKeyboardShortcut(() => {
     setSearchOpen(true);
@@ -211,13 +216,17 @@ function Header() {
                   ابدأ المقارنة
                 </Link>
 
-                <Link
-                  href="/login"
-                  aria-label="تسجيل الدخول"
-                  className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-secondary hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <LogIn size={16} />
-                </Link>
+                {isAuthed ? (
+                  <UserMenu />
+                ) : (
+                  <Link
+                    href="/login"
+                    aria-label="تسجيل الدخول"
+                    className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-secondary hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <LogIn size={16} />
+                  </Link>
+                )}
 
                 <button
                   type="button"

@@ -1,0 +1,119 @@
+'use client';
+
+import { useSession, signOut } from 'next-auth/react';
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ChevronDown, History, LogOut, User as UserIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export default function UserMenu() {
+  const { data: session, status } = useSession();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('mousedown', onClick);
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('mousedown', onClick);
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  if (status !== 'authenticated' || !session?.user) return null;
+
+  const { name, email, image } = session.user;
+  const initials = (name || email || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={cn(
+          'inline-flex items-center gap-2 h-9 px-2 sm:pl-2 sm:pr-3 rounded-full bg-white/5 border border-white/10 text-secondary hover:text-white hover:bg-white/10 transition-colors'
+        )}
+      >
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt={name ?? ''}
+            className="w-7 h-7 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <span className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-purple text-white text-xs font-bold flex items-center justify-center">
+            {initials}
+          </span>
+        )}
+        <span className="hidden sm:inline text-sm font-medium max-w-[120px] truncate">
+          {name ?? email}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn(
+            'transition-transform duration-200',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute end-0 mt-2 w-64 glass rounded-2xl border border-white/10 overflow-hidden z-50 shadow-2xl"
+        >
+          <div className="px-4 py-3 border-b border-white/5">
+            <p className="text-sm font-semibold text-primary truncate">
+              {name ?? 'مرحباً'}
+            </p>
+            {email && (
+              <p className="text-xs text-muted truncate">{email}</p>
+            )}
+          </div>
+          <div className="py-1">
+            <Link
+              href="/history"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-secondary hover:bg-white/5 hover:text-white transition-colors"
+            >
+              <History size={16} />
+              سجل البحث
+            </Link>
+            <Link
+              href="/profile"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-secondary hover:bg-white/5 hover:text-white transition-colors"
+            >
+              <UserIcon size={16} />
+              الملف الشخصي
+            </Link>
+          </div>
+          <div className="border-t border-white/5 py-1">
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: '/' })}
+              role="menuitem"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
+            >
+              <LogOut size={16} />
+              تسجيل الخروج
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

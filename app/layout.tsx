@@ -2,6 +2,7 @@ import Footer from '@/components/Footer'
 import './globals.css'
 import Header from '@/components/Header'
 import LightRays from '@/components/LightRays'
+import Providers from '@/components/Providers'
 
 export const metadata = {
   title: 'Price Scraper',
@@ -16,7 +17,8 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body>
-        <Header />
+        <Providers>
+          <Header />
           <div className="fixed inset-0 z-[-1] w-screen h-screen">
             <LightRays
               raysOrigin="top-center-offset"
@@ -32,12 +34,13 @@ export default function RootLayout({
               pulsating={false}
               fadeDistance={1}
               saturation={1}
-            />  
+            />
           </div>
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
+          <main className="flex-1">
+            {children}
+          </main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   )

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Clock,
@@ -78,6 +78,7 @@ export default function HistoryPage() {
   };
 
   return (
+    <Suspense>
     <div className="min-h-[calc(100vh-200px)] px-4 py-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
         {/* Hero */}
@@ -294,6 +295,7 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+    </Suspense>
   );
 }
 
