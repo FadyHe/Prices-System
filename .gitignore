@@ -4,6 +4,7 @@
 /node_modules
 /.claude
 /.pnp
+/.kilo
 .pnp.*
 .yarn/*
 !.yarn/patches
