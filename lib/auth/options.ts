@@ -58,10 +58,21 @@ export const authOptions: NextAuthOptions = {
             email,
             image: user.image,
             provider: 'google',
+            emailVerified: true,
+            emailVerifiedAt: new Date(),
           });
-        } else if (!existing.image && user.image) {
-          existing.image = user.image;
-          await existing.save();
+        } else {
+          let changed = false;
+          if (!existing.image && user.image) {
+            existing.image = user.image;
+            changed = true;
+          }
+          if (!existing.emailVerified) {
+            existing.emailVerified = true;
+            existing.emailVerifiedAt = new Date();
+            changed = true;
+          }
+          if (changed) await existing.save();
         }
       }
       return true;
@@ -69,12 +80,25 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = (user as { id?: string }).id;
+        token.plan = 'free';
+        token.emailVerified = true;
+      } else if (token.id) {
+        const fresh = await User.findById(token.id)
+          .select('plan emailVerified')
+          .lean();
+        if (fresh) {
+          token.plan = fresh.plan ?? 'free';
+          token.emailVerified = !!fresh.emailVerified;
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.id) {
-        (session.user as { id?: string }).id = token.id as string;
+      if (session.user) {
+        if (token.id) (session.user as { id?: string }).id = token.id as string;
+        (session.user as { plan?: string }).plan = (token.plan as string) ?? 'free';
+        (session.user as { emailVerified?: boolean }).emailVerified =
+          !!token.emailVerified;
       }
       return session;
     },

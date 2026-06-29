@@ -31,6 +31,16 @@ const UserSchema = new Schema(
       enum: ['credentials', 'google'],
       default: 'credentials',
     },
+    emailVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date },
+    plan: {
+      type: String,
+      enum: ['free', 'pro', 'premium'],
+      default: 'free',
+      index: true,
+    },
+    planRenewsAt: { type: Date },
+    paymobCustomerId: { type: String },
   },
   { timestamps: true }
 );
@@ -60,10 +70,44 @@ SearchHistorySchema.index(
   { collation: { locale: 'en', strength: 2 } }
 );
 
+const EmailVerificationTokenSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+    tokenHash: { type: String, required: true, unique: true, index: true },
+    expiresAt: { type: Date, required: true, index: { expires: 0 } },
+    consumedAt: { type: Date },
+  },
+  { timestamps: true }
+);
+
+const AuditLogSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    ip: { type: String, index: true },
+    action: { type: String, required: true, index: true },
+    query: { type: String },
+    resultCount: { type: Number },
+    meta: { type: Schema.Types.Mixed },
+  },
+  { timestamps: true }
+);
+AuditLogSchema.index({ createdAt: -1 });
+
 export type UserDoc = InferSchemaType<typeof UserSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 export type SearchHistoryDoc = InferSchemaType<typeof SearchHistorySchema> & {
+  _id: mongoose.Types.ObjectId;
+};
+export type EmailVerificationTokenDoc = InferSchemaType<
+  typeof EmailVerificationTokenSchema
+> & { _id: mongoose.Types.ObjectId };
+export type AuditLogDoc = InferSchemaType<typeof AuditLogSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 
@@ -74,6 +118,17 @@ export const User: Model<UserDoc> =
 export const SearchHistory: Model<SearchHistoryDoc> =
   (mongoose.models.SearchHistory as Model<SearchHistoryDoc>) ||
   mongoose.model<SearchHistoryDoc>('SearchHistory', SearchHistorySchema);
+
+export const EmailVerificationToken: Model<EmailVerificationTokenDoc> =
+  (mongoose.models.EmailVerificationToken as Model<EmailVerificationTokenDoc>) ||
+  mongoose.model<EmailVerificationTokenDoc>(
+    'EmailVerificationToken',
+    EmailVerificationTokenSchema
+  );
+
+export const AuditLog: Model<AuditLogDoc> =
+  (mongoose.models.AuditLog as Model<AuditLogDoc>) ||
+  mongoose.model<AuditLogDoc>('AuditLog', AuditLogSchema);
 
 export interface SearchHistoryResponse {
   id: string;
