@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
+import crypto from 'node:crypto';
 import { connectDB } from '@/lib/db/mongodb';
-import { User } from '@/lib/db/models';
+import { EmailVerificationToken, User } from '@/lib/db/models';
 import {
   hashPassword,
   isValidEmail,
   passwordIssues,
 } from '@/lib/auth/password';
+import { sendEmail, verificationEmail } from '@/lib/email/send';
 
 export const runtime = 'nodejs';
+
+const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export async function POST(req: Request) {
   let body: { name?: string; email?: string; password?: string };
@@ -57,11 +61,30 @@ export async function POST(req: Request) {
       passwordHash,
       provider: 'credentials',
     });
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(rawToken)
+      .digest('hex');
+    await EmailVerificationToken.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+    });
+
+    const baseUrl =
+      process.env.NEXTAUTH_URL ?? new URL(req.url).origin;
+    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${rawToken}&id=${user._id.toString()}`;
+    const { subject, html, text } = verificationEmail(name, verifyUrl);
+    await sendEmail({ to: email, subject, html, text });
+
     return NextResponse.json(
       {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        requiresVerification: true,
       },
       { status: 201 }
     );
