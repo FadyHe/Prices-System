@@ -1,16 +1,24 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
-
-import { scrapeAmazon } from '@/lib/scrapers/amazon';
-import { scrapeJumia } from '@/lib/scrapers/jumia';
-import { scrapeNoon } from '@/lib/scrapers/noon';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/options';
 import { normalizeProductName } from '@/lib/search/normalize';
 import { scoreProduct } from '@/lib/search/score';
+import { audit, getClientIp } from '@/lib/audit';
+import { checkAndRecord } from '@/lib/quota';
+import type { Page } from 'puppeteer';
 
 import type { Product } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
 const MAX_PER_SITE = 200;
+const MAX_QUERY_LENGTH = 100;
+
+function validateQuery(input: unknown): string | null {
+  if (typeof input !== 'string') return null;
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.length > MAX_QUERY_LENGTH) return null;
+  return trimmed;
+}
 
 /* ================== STEALTH ================== */
 async function applyStealth(page: Page) {
@@ -46,105 +54,117 @@ function randomDelay(min = 5000, max = 10000): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/* ================== SCRAPE HELPERS ================== */
-async function runScraper(
-  browser: Browser,
-  name: string,
-  scraper: (page: Page, q: string, max: number) => Promise<Product[]>,
-  query: string
-): Promise<Product[]> {
-  console.log(`▶️ Starting ${name} scraper`);
+/* ================== SCRAPER ================== */
 
-  const page = await browser.newPage();
-  await applyStealth(page);
-
-  try {
-    const result = await scraper(page, query, MAX_PER_SITE);
-    console.log(`✅ ${name} done → ${result.length} products`);
-    return result;
-  } catch (err) {
-    console.error(`❌ ${name} failed`, err);
-    return [];
-  } finally {
-    await page.close();
+async function scrapeViaRemote(url: string, token: string, query: string): Promise<Product[]> {
+  const res = await fetch(`${url.replace(/\/$/, '')}/scrape`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) {
+    throw new Error(`remote scraper returned ${res.status}`);
   }
+  const data = await res.json();
+  return Array.isArray(data.products) ? (data.products as Product[]) : [];
 }
 
-/* ================== MAIN SCRAPER ================== */
 async function scrapeAll(query: string): Promise<Product[]> {
+  const remoteUrl = process.env.SCRAPER_URL;
+  const remoteToken = process.env.SCRAPER_TOKEN;
+  if (remoteUrl && remoteToken) {
+    return scrapeViaRemote(remoteUrl, remoteToken, query);
+  }
+
+  const puppeteer = (await import('puppeteer')).default;
+  const { scrapeAmazon } = await import('@/lib/scrapers/amazon');
+  const { scrapeJumia } = await import('@/lib/scrapers/jumia');
+  const { scrapeNoon } = await import('@/lib/scrapers/noon');
+
   const browser = await puppeteer.launch({
-    headless: true, // خليه false وانت بتفهم اللي بيحصل
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     timeout: 90_000,
   });
 
-  const allProducts: Product[] = [];
-
   try {
-    // 1️⃣ Amazon
-    const amazon = await runScraper(
-      browser,
-      'Amazon',
-      scrapeAmazon,
-      query
-    );
-    allProducts.push(...amazon);
-
-    await randomDelay();
-
-    // 2️⃣ Jumia
-    const jumia = await runScraper(
-      browser,
-      'Jumia',
-      scrapeJumia,
-      query
-    );
-    allProducts.push(...jumia);
-
-    await randomDelay();
-
-    // 3️⃣ Noon
-    const noon = await runScraper(
-      browser,
-      'Noon',
-      scrapeNoon,
-      query
-    );
-    allProducts.push(...noon);
-
-    await randomDelay();
-
-    // 4️⃣ Google Shopping
-    // const google = await runScraper(
-    //   browser,
-    //   'Google Shopping',
-    //   scrapeGoogleShopping,
-    //   query
-    // );
-    // allProducts.push(...google);
-
+    const all: Product[] = [];
+    for (const { name, fn } of [
+      { name: 'Amazon', fn: scrapeAmazon },
+      { name: 'Jumia', fn: scrapeJumia },
+      { name: 'Noon', fn: scrapeNoon },
+    ] as const) {
+      const page = await browser.newPage();
+      try {
+        await applyStealth(page);
+        const res = await fn(page, query, MAX_PER_SITE);
+        all.push(...res);
+      } catch (err) {
+        console.error(`[scrape] ${name} failed`, err);
+      } finally {
+        await page.close();
+      }
+      await randomDelay();
+    }
+    return all;
   } finally {
     await browser.close();
   }
-
-  return allProducts;
 }
 
 /* ================== API ROUTE ================== */
 export async function POST(req: Request) {
-  const body = await req.json();
-  const query = body?.query;
+  const ip = getClientIp(req);
 
-  if (!query || typeof query !== 'string') {
+  let body: { query?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: 'invalid body' }, { status: 400 });
+  }
+  const query = validateQuery(body?.query);
+  if (!query) {
     return Response.json(
-      { error: 'query is required' },
+      { error: 'query is required (1–100 chars)' },
       { status: 400 }
     );
   }
 
-  const raw = await scrapeAll(query.trim());
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as { id?: string } | undefined)?.id;
+  const plan = (session?.user as { plan?: string } | undefined)?.plan ?? 'free';
 
-  // --- Server-side relevance filtering ---
+  const quota = await checkAndRecord({ userId, ip, plan });
+  if (!quota.allowed) {
+    await audit({
+      userId,
+      ip,
+      action: 'scrape.quota_exceeded',
+      query,
+      meta: { reason: quota.reason, plan },
+    });
+    const message =
+      quota.reason === 'day'
+        ? 'وصلت للحد اليومي. حاول بكره أو رقّي حسابك.'
+        : 'طلباتك كتير في الساعة دي. استنى شوية.';
+    return Response.json(
+      {
+        error: message,
+        quota: {
+          remaining: quota.remaining,
+          limit: quota.limit,
+          reason: quota.reason,
+        },
+      },
+      { status: 429 }
+    );
+  }
+
+  const raw = await scrapeAll(query);
+
   const { tokens: queryTokens } = normalizeProductName(query);
   const MIN_RELEVANCE = 0.3;
 
@@ -158,11 +178,22 @@ export async function POST(req: Request) {
     .filter((p) => p.score > 0 && p.relevance >= MIN_RELEVANCE)
     .sort((a, b) => a.price - b.price);
 
-  console.log(`🔍 Filter: ${raw.length} scraped → ${filtered.length} relevant (query tokens: [${queryTokens.join(', ')}])`);
+  await audit({
+    userId,
+    ip,
+    action: 'scrape.success',
+    query,
+    resultCount: filtered.length,
+    meta: { plan, quota: quota.remaining },
+  });
 
   return Response.json({
     totalScraped: raw.length,
     count: filtered.length,
     products: filtered,
+    quota: {
+      remaining: quota.remaining,
+      limit: quota.limit,
+    },
   });
 }
