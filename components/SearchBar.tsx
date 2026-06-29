@@ -32,6 +32,7 @@ export default function SearchBar({
     const q = searchParams.get('q') ?? '';
     if (q === lastSyncedRef.current) return;
     lastSyncedRef.current = q;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync from external (URL) state
     setValue(q);
   }, [searchParams]);
 

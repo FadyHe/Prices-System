@@ -13,6 +13,7 @@ import {
 import {
   ChevronDown,
   LogIn,
+  MailCheck,
   Menu,
   Search,
   Sparkles,
@@ -94,9 +95,12 @@ function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isAuthed = status === 'authenticated' && !!session?.user;
+  const showVerifyBanner =
+    isAuthed && !bannerDismissed && !session?.user?.emailVerified;
 
   useKeyboardShortcut(() => {
     setSearchOpen(true);
@@ -300,6 +304,31 @@ function Header() {
 
       {/* Push page content below the fixed header */}
       <div aria-hidden className="h-16" />
+
+      {showVerifyBanner && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm">
+            <MailCheck size={16} className="shrink-0" />
+            <span className="flex-1">
+              أكّد بريدك الإلكتروني عشان تقدر تحفظ نتائج البحث.
+            </span>
+            <Link
+              href="/login"
+              className="text-amber-200 hover:text-white underline underline-offset-2"
+            >
+              أعد إرسال الرسالة
+            </Link>
+            <button
+              type="button"
+              aria-label="إغلاق"
+              onClick={() => setBannerDismissed(true)}
+              className="text-amber-200/80 hover:text-white"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Command-bar search overlay */}
       {searchOpen && (

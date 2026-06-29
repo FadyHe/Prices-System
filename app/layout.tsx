@@ -3,6 +3,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import LightRays from '@/components/LightRays'
 import Providers from '@/components/Providers'
+import { SaveSearchPrompt } from '@/components/SaveSearchPrompt'
 
 export const metadata = {
   title: 'Price Scraper',
@@ -40,6 +41,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <SaveSearchPrompt />
         </Providers>
       </body>
     </html>
