@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { normalizeProductName } from '@/lib/search/normalize';
 import { scoreProduct } from '@/lib/search/score';
+import { fireSavePrompt } from '@/components/SaveSearchPrompt';
 
 export interface Product {
   name: string;
@@ -51,12 +53,14 @@ function filterByRelevance(
 
 /** Hook that manages scraping, filtering, and all related state */
 export function useScraper(initialQuery: string = '') {
+  const { status } = useSession();
   const [scrapeQuery, setScrapeQuery] = useState(initialQuery);
   const [filterQuery, setFilterQuery] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const savePromptFiredRef = useRef(false);
 
   const filteredProducts = useMemo(() => {
     if (products.length === 0) return [];
@@ -92,6 +96,14 @@ export function useScraper(initialQuery: string = '') {
       const result = await fetchProducts(query, controller.signal);
       if (requestId !== requestIdRef.current) return;
       setProducts(result);
+      if (
+        status === 'unauthenticated' &&
+        !savePromptFiredRef.current &&
+        result.length > 0
+      ) {
+        savePromptFiredRef.current = true;
+        fireSavePrompt();
+      }
     } catch (err) {
       if (controller.signal.aborted || requestId !== requestIdRef.current) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;

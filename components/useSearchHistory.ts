@@ -83,7 +83,6 @@ export function useSearchHistory() {
 
   // Hydrate from localStorage on first mount (works for both authed and guests)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial hydration from an external system (localStorage)
     setEntries(readStore());
     setHydrated(true);
 
