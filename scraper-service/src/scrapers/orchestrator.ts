@@ -39,8 +39,8 @@ function randomDelay(min = 5000, max = 10000): Promise<void> {
 
 export async function runAllScrapers(query: string): Promise<Product[]> {
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     timeout: 90_000,
   });
 

@@ -43,8 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-ENV PUPPETEER_SKIP_DOWNLOAD=true \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false \
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false \
     NODE_ENV=production
 
 WORKDIR /app
