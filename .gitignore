@@ -6,6 +6,7 @@
 /.pnp
 /.kilo
 .pnp.*
+/.vscode
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
