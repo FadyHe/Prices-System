@@ -57,7 +57,9 @@ function randomDelay(min = 5000, max = 10000): Promise<void> {
 /* ================== SCRAPER ================== */
 
 async function scrapeViaRemote(url: string, token: string, query: string): Promise<Product[]> {
-  const res = await fetch(`${url.replace(/\/$/, '')}/scrape`, {
+  const normalizedUrl = url.replace(/\/$/, '');
+  const fullUrl = normalizedUrl.startsWith('http') ? `${normalizedUrl}/scrape` : `https://${normalizedUrl}/scrape`;
+  const res = await fetch(fullUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
