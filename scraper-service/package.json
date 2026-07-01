@@ -1,0 +1,23 @@
+{
+  "name": "scraper-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Puppeteer scraper service for the Qarinha price-comparison app. Runs Amazon/Jumia/Noon and returns merged product results over HTTP.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "puppeteer": "^24.37.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.19.32",
+    "@types/puppeteer": "^5.4.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
