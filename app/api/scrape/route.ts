@@ -87,7 +87,7 @@ async function scrapeAll(query: string): Promise<Product[]> {
   const { scrapeNoon } = await import('@/lib/scrapers/noon');
 
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     timeout: 90_000,
   });
