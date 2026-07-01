@@ -72,6 +72,6 @@ app.post('/scrape', requireBearer, async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[scraper-service] listening on :${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[scraper-service] listening on 0.0.0.0:${PORT}`);
 });

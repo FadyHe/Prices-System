@@ -49,16 +49,17 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true \
 
 WORKDIR /app
 
+# Install ALL deps (including dev) so @types/express, @types/puppeteer and
+# typescript are present for the tsc compile step.
 COPY package.json ./
-RUN npm install --omit=dev
+RUN npm install
 
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm install --no-save typescript@5.9.3 && \
-    npx tsc -p tsconfig.json && \
-    npm uninstall typescript
+RUN npx tsc -p tsconfig.json && \
+    npm prune --omit=dev
 
-ENV PORT=10000
-EXPOSE 10000
+ENV PORT=8080
+EXPOSE 8080
 
 CMD ["node", "dist/index.js"]
