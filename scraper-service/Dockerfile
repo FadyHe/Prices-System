@@ -52,7 +52,7 @@ WORKDIR /app
 # Install ALL deps (including dev) so @types/express, @types/puppeteer and
 # typescript are present for the tsc compile step.
 COPY package.json ./
-RUN npm install
+RUN npm install --include=dev
 
 COPY tsconfig.json ./
 COPY src ./src
