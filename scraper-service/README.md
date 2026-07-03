@@ -1,97 +1,131 @@
 # scraper-service
 
-Standalone Puppeteer-based scraper for the **Qarinha** price-comparison app.
+Local Puppeteer scraper module that runs in a **GitHub Actions** runner when the
+Next.js app requests a price search.
 
-This service runs Amazon.eg, Jumia.eg and Noon.com scrapers in a single Node
-process, applies the same relevance filter the Next.js API route used to apply
-locally, and returns `{ totalScraped, count, products }` over HTTP.
+This directory is no longer deployed as a standalone service. Render / Koyeb /
+Back4app all require a credit card even on their free tiers. GitHub Actions
+`ubuntu-latest` runners are free, ship with Google Chrome pre-installed, and
+play nicely with Puppeteer without a Dockerfile.
 
-The Next.js app on Vercel calls this service over the network when
-`SCRAPER_URL` + `SCRAPER_TOKEN` are configured. Quota checking, MongoDB
-history and audit logging stay in the Next.js app — only the actual scraping
-is delegated here.
+## New flow (async job)
 
-## Endpoints
+```
+Browser ──POST──▶  /api/scrape          (Next.js, Vercel)
+                      │
+                      ├─ quota check / audit log  (unchanged)
+                      ├─ create ScrapeJob doc     (status="pending")
+                      └─ POST /repos/{owner}/{repo}/dispatches
+                              (event_type=run-scrape, client_payload={query,jobId})
+                                  │
+                                  ▼
+                  .github/workflows/scrape.yml  (ubuntu-latest)
+                                  │
+                                  ├─ npm ci (scraper-service)
+                                  ├─ runAllScrapers(query)
+                                  │     └─ Amazon.eg, Jumia.eg, Noon.com
+                                  └─ POST /api/scrape/webhook
+                                          Authorization: Bearer <WEBHOOK_SECRET>
+                                          { jobId, products, totalScraped, count }
+                                              │
+                                              ▼
+                                          ScrapeJob updated → status="complete"
+Browser ──GET──▶  /api/scrape/status/{jobId}    (polls every 2s, 90s timeout)
+```
 
-| Method | Path       | Auth   | Body                  | Response                                       |
-| ------ | ---------- | ------ | --------------------- | ---------------------------------------------- |
-| GET    | `/health`  | none   | —                     | `{ "ok": true }` (200)                         |
-| POST   | `/scrape`  | Bearer | `{ "query": "..." }`  | `{ totalScraped, count, products: Product[] }` |
+The frontend never blocks waiting for a Puppeteer run; it submits the job, gets
+a `jobId` back, then polls `/api/scrape/status/{jobId}` until the workflow
+posts results to `/api/scrape/webhook`.
 
-`Product` is `{ name, price, currency, seller, url, source, image, score, relevance }`.
+## Local development
 
-Query validation: required, trimmed, 1–100 chars.
-
-## Environment variables
-
-| Name            | Required | Default | Description                                              |
-| --------------- | -------- | ------- | -------------------------------------------------------- |
-| `SCRAPER_TOKEN` | **yes**  | —       | Shared secret. The Next.js app sends it as a Bearer token. |
-| `PORT`          | no       | `3001`  | Local port. Render sets `$PORT` automatically.           |
-
-Generate a token with: `openssl rand -hex 32`.
-
-## Run locally
+For local dev you can still run the orchestrator directly with ts-node:
 
 ```bash
 cd scraper-service
 npm install
-SCRAPER_TOKEN=devtoken PORT=3001 npm run dev
-# or build + start:
-npm run build
-SCRAPER_TOKEN=devtoken npm start
+npm run build   # produces dist/
+node -e "require('./dist/scrapers/orchestrator').runAllScrapers('iphone 15').then(console.log)"
 ```
 
-Smoke test:
+The Next.js dev server falls back to in-process Puppeteer if `GITHUB_TOKEN` /
+`GITHUB_REPO` are not set, but in the new architecture the recommended path is
+to point at a real GitHub repo and let the workflow handle the run.
 
-```bash
-curl http://localhost:3001/health
-curl -X POST http://localhost:3001/scrape \
-  -H "Authorization: Bearer devtoken" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"iphone 15"}'
-```
+## Environment variables (Vercel project)
 
-> Puppeteer downloads its own Chromium on `npm install`. On Windows the dev
-> machine uses the `chrome/win64-...` bundle in the parent repo; the Docker
-> image (used on Render) installs Debian's system Chromium dependencies and
-> lets Puppeteer fetch its own build.
+| Name             | Required | Description                                                                                  |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`   | **yes**  | Fine-grained PAT used to call the repository_dispatch API. See setup steps below.            |
+| `GITHUB_REPO`    | **yes**  | `owner/repo` of the repo that hosts `.github/workflows/scrape.yml`.                          |
+| `WEBHOOK_SECRET` | **yes**  | Shared secret. Must match the GitHub repo secret with the same name.                         |
 
-## Deploy to Render (free tier)
+For local dev, copy `.env.local.example` to `.env.local` and fill these in.
 
-1. Push the repo to GitHub (see "GitHub steps" in the project README).
-2. In Render dashboard → **New +** → **Web Service**.
-3. **Connect repo**: select your `web-scrapper` GitHub repo.
-4. **Root directory**: `scraper-service`
-5. **Runtime**: `Docker` (Render will pick up the `Dockerfile` automatically).
-6. **Instance type**: `Free`.
-7. **Environment** → add:
-   - `SCRAPER_TOKEN` = a long random string (same one you will put in Vercel)
-   - `PORT` is not needed — Render sets it; the app reads `process.env.PORT`.
-8. **Health check path**: `/health`.
-9. Click **Create Web Service**. The first build pulls the base image, runs
-   `npm install`, compiles TypeScript, and starts the server.
-10. Copy the Render URL (e.g. `https://qarinha-scraper.onrender.com`).
+## GitHub repo configuration
 
-## Wire the Next.js app to this service
+1. **Add the secret** in your GitHub repo → **Settings → Secrets and variables → Actions**:
+   - `WEBHOOK_SECRET` — a long random string, e.g. `openssl rand -hex 32`.
+     Must match the `WEBHOOK_SECRET` env var in your Vercel project.
+2. **Add the variable** (Settings → Secrets and variables → Actions → Variables tab):
+   - `WEBHOOK_URL` — your deployed Vercel URL + `/api/scrape/webhook`,
+     e.g. `https://qarinha.vercel.app/api/scrape/webhook`. For local dev use
+     a tunnel like ngrok and update the variable.
+3. **Create the fine-grained PAT** used by Vercel to trigger the workflow.
+   Exact steps:
 
-In the **Vercel** project (and locally in `.env.local`):
+   1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
+   2. Click **Generate new token**.
+   3. **Token name**: e.g. `qarinha-vercel-dispatch`.
+   4. **Resource owner**: your own user (or the org that owns the repo).
+   5. **Expiration**: 90 days (rotate it; never set "No expiration").
+   6. **Repository access**: choose **Only select repositories**, then pick the
+      single repo that hosts `.github/workflows/scrape.yml`. This is the
+      least-privilege part — it cannot dispatch events on any other repo.
+   7. **Permissions → Repository permissions**:
+      - **Actions**: **Read and write** — required to call
+        `POST /repos/{owner}/{repo}/dispatches`. Leave every other
+        permission set to "No access" (Contents, Issues, Pull requests, etc.).
+   8. Click **Generate token**, copy the value, and paste it as `GITHUB_TOKEN`
+      in your Vercel project (and in `.env.local` for local dev).
 
-```
-SCRAPER_URL=https://qarinha-scraper.onrender.com
-SCRAPER_TOKEN=<the same token you set on Render>
-```
+   The PAT can only trigger workflows on the one repo you selected. It cannot
+   read or modify code, issues, packages, or any other resource.
 
-`app/api/scrape/route.ts` checks for both env vars; if present it forwards
-the request to `${SCRAPER_URL}/scrape` and applies the same Bearer auth,
-quota, history and audit logic locally. If either env var is missing it
-falls back to running Puppeteer in-process (useful for local dev).
+4. **Vercel env vars** (project → Settings → Environment Variables):
+   - `GITHUB_TOKEN` = the PAT from step 3.
+   - `GITHUB_REPO`  = `your-username/your-repo`.
+   - `WEBHOOK_SECRET` = the same value as the GitHub repo secret.
+
+## Verifying the flow
+
+1. From the Vercel deployment's shell, or with `curl` against the public URL:
+   ```bash
+   curl -X POST https://<your-app>.vercel.app/api/scrape \
+     -H "Content-Type: application/json" \
+     -d '{"query":"iphone 15"}'
+   ```
+   You should get `{"jobId":"<hex>","status":"pending",...}` back immediately.
+2. Watch the GitHub repo → **Actions** tab — a `Scrape (GitHub Actions runner)`
+   run should start within a few seconds.
+3. Poll the status:
+   ```bash
+   curl https://<your-app>.vercel.app/api/scrape/status/<jobId>
+   ```
+4. After ~30–60 s the response flips to `status: "complete"` and includes the
+   product list. The webhook from the workflow also posts the same payload to
+   `/api/scrape/webhook` with `Authorization: Bearer <WEBHOOK_SECRET>`.
 
 ## Notes
 
-- The `--no-sandbox` Chromium flag is required when running as root in the
-  Render container. Do not point this service at untrusted input.
-- Free Render instances sleep after 15 min of inactivity. The first request
-  after sleep can take 30–60 s. If you need always-on, upgrade the plan.
-- The Puppeteer system library list in the `Dockerfile` matches Debian
-  Bookworm. If you bump the base image, double-check the dep list.
+- `PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome` is set in the workflow.
+  Ubuntu runners ship with Google Chrome pre-installed; we skip the
+  ~200 MB Chromium download Puppeteer would otherwise do at install time.
+- The workflow's final `curl` step runs in an `if: always()` block, so the
+  webhook is notified even if the scraper throws — the job is then marked
+  `failed` with an `error` field.
+- Free GitHub-hosted runners are limited to ~6 hours per job; the workflow
+  uses a 10-minute timeout, which is plenty for Amazon + Jumia + Noon.
+- The old `Dockerfile`, `dist/index.js` and `src/index.ts` (Express HTTP
+  server) are kept in the tree in case you want to deploy this module as a
+  long-lived service elsewhere, but they are no longer the recommended path.

@@ -1,0 +1,117 @@
+name: Scrape (GitHub Actions runner)
+
+on:
+  repository_dispatch:
+    types: [run-scrape]
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Search query"
+        required: true
+        type: string
+      jobId:
+        description: "Job ID (any string for manual runs)"
+        required: false
+        type: string
+        default: "manual"
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      QUERY: ${{ github.event.client_payload.query || inputs.query }}
+      JOB_ID: ${{ github.event.client_payload.jobId || inputs.jobId }}
+      WEBHOOK_URL: ${{ vars.WEBHOOK_URL }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+    steps:
+      - name: Validate inputs
+        run: |
+          if [ -z "$QUERY" ]; then
+            echo "QUERY is empty"
+            exit 1
+          fi
+          if [ -z "$WEBHOOK_URL" ] || [ -z "$WEBHOOK_SECRET" ]; then
+            echo "WEBHOOK_URL or WEBHOOK_SECRET missing"
+            exit 1
+          fi
+          echo "Job ID: $JOB_ID"
+          echo "Query:  $QUERY"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: scraper-service/package-lock.json
+
+      - name: Install scraper-service dependencies
+        working-directory: scraper-service
+        run: npm ci || npm install
+
+      - name: Install Puppeteer Chrome (skipping Chromium download)
+        working-directory: scraper-service
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: |
+          set -e
+          if ! command -v google-chrome >/dev/null 2>&1; then
+            echo "Google Chrome is not installed on the runner."
+            exit 1
+          fi
+          google-chrome --version
+          echo "PUPPETEER_EXECUTABLE_PATH=$PUPPETEER_EXECUTABLE_PATH" >> "$GITHUB_ENV"
+
+      - name: Run scraper orchestrator
+        id: scrape
+        working-directory: scraper-service
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: |
+          set -e
+          node -e "
+            const { runAllScrapers } = require('./dist/scrapers/orchestrator');
+            const { normalizeProductName } = require('./dist/search/normalize');
+            const { scoreProduct } = require('./dist/search/score');
+            (async () => {
+              const query = process.env.QUERY;
+              const raw = await runAllScrapers(query);
+              const { tokens: queryTokens } = normalizeProductName(query);
+              const MIN_RELEVANCE = 0.3;
+              const filtered = raw
+                .map(p => {
+                  const { tokens: pTokens } = normalizeProductName(p.name);
+                  const score = scoreProduct(pTokens, queryTokens);
+                  const relevance = queryTokens.length > 0 ? score / queryTokens.length : 0;
+                  return { ...p, score, relevance };
+                })
+                .filter(p => p.score > 0 && p.relevance >= MIN_RELEVANCE)
+                .sort((a, b) => a.price - b.price);
+              const out = { jobId: process.env.JOB_ID, totalScraped: raw.length, count: filtered.length, products: filtered };
+              require('fs').writeFileSync('result.json', JSON.stringify(out));
+              console.log('scraped=' + raw.length + ' kept=' + filtered.length);
+            })().catch(err => { console.error(err); process.exit(1); });
+          "
+
+      - name: Post results to webhook
+        if: always()
+        env:
+          WEBHOOK_URL: ${{ env.WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ env.WEBHOOK_SECRET }}
+          JOB_ID: ${{ env.JOB_ID }}
+        run: |
+          set +e
+          if [ -f scraper-service/result.json ]; then
+            BODY=$(cat scraper-service/result.json)
+          else
+            BODY="{\"jobId\":\"$JOB_ID\",\"error\":\"scraper_failed\"}"
+          fi
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Authorization: Bearer $WEBHOOK_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "$BODY"
+          echo

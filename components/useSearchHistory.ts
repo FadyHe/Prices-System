@@ -77,15 +77,12 @@ function sameEntries(a: HistoryEntry[], b: HistoryEntry[]): boolean {
 export function useSearchHistory() {
   const { status } = useSession();
   const isAuthed = status === 'authenticated';
-  const [entries, setEntries] = useState<HistoryEntry[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [entries, setEntries] = useState<HistoryEntry[]>(() => readStore());
+  const [hydrated, setHydrated] = useState(true);
   const mergeInFlight = useRef(false);
+  void setHydrated;
 
-  // Hydrate from localStorage on first mount (works for both authed and guests)
   useEffect(() => {
-    setEntries(readStore());
-    setHydrated(true);
-
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
         const next = readStore();

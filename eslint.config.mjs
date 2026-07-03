@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Local-only tooling, not part of the app source
     ".claude/**",
+    // Standalone scraper module — has its own tsconfig and emitted JS
+    "scraper-service/**",
   ]),
 ]);
 

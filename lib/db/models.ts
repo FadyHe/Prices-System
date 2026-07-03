@@ -98,6 +98,31 @@ const AuditLogSchema = new Schema(
 );
 AuditLogSchema.index({ createdAt: -1 });
 
+const ScrapeJobSchema = new Schema(
+  {
+    jobId: { type: String, required: true, unique: true, index: true },
+    query: { type: String, required: true, trim: true },
+    status: {
+      type: String,
+      enum: ['pending', 'running', 'complete', 'failed'],
+      default: 'pending',
+      index: true,
+    },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    ip: { type: String, index: true },
+    plan: { type: String },
+    products: { type: [SavedProductSchema], default: [] },
+    totalScraped: { type: Number },
+    count: { type: Number },
+    error: { type: String },
+    startedAt: { type: Date },
+    completedAt: { type: Date },
+  },
+  { timestamps: true }
+);
+ScrapeJobSchema.index({ createdAt: -1 });
+ScrapeJobSchema.index({ status: 1, createdAt: -1 });
+
 export type UserDoc = InferSchemaType<typeof UserSchema> & {
   _id: mongoose.Types.ObjectId;
 };
@@ -108,6 +133,9 @@ export type EmailVerificationTokenDoc = InferSchemaType<
   typeof EmailVerificationTokenSchema
 > & { _id: mongoose.Types.ObjectId };
 export type AuditLogDoc = InferSchemaType<typeof AuditLogSchema> & {
+  _id: mongoose.Types.ObjectId;
+};
+export type ScrapeJobDoc = InferSchemaType<typeof ScrapeJobSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 
@@ -129,6 +157,10 @@ export const EmailVerificationToken: Model<EmailVerificationTokenDoc> =
 export const AuditLog: Model<AuditLogDoc> =
   (mongoose.models.AuditLog as Model<AuditLogDoc>) ||
   mongoose.model<AuditLogDoc>('AuditLog', AuditLogSchema);
+
+export const ScrapeJob: Model<ScrapeJobDoc> =
+  (mongoose.models.ScrapeJob as Model<ScrapeJobDoc>) ||
+  mongoose.model<ScrapeJobDoc>('ScrapeJob', ScrapeJobSchema);
 
 export interface SearchHistoryResponse {
   id: string;

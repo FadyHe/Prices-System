@@ -5,6 +5,7 @@ export type Action =
   | 'scrape.success'
   | 'scrape.quota_exceeded'
   | 'scrape.rate_limited'
+  | 'scrape.failed'
   | 'auth.register'
   | 'auth.verify_email'
   | 'auth.signin';

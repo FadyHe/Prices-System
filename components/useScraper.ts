@@ -16,19 +16,66 @@ export interface Product {
   relevance?: number;
 }
 
-/** Fetch products from the scrape API */
-async function fetchProducts(query: string, signal?: AbortSignal): Promise<Product[]> {
+interface JobStatus {
+  jobId: string;
+  status: 'pending' | 'running' | 'complete' | 'failed';
+  totalScraped?: number;
+  count?: number;
+  error?: string | null;
+  products?: Product[];
+}
+
+/** Submit a search query and get a jobId back. */
+async function submitJob(query: string, signal?: AbortSignal): Promise<string> {
   const res = await fetch('/api/scrape', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query }),
     signal,
   });
+  if (!res.ok) {
+    let msg = 'API error';
+    try {
+      const data = await res.json();
+      if (data?.error) msg = String(data.error);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const data = (await res.json()) as { jobId: string };
+  return data.jobId;
+}
 
-  if (!res.ok) throw new Error('API error');
-
-  const data = await res.json();
-  return (data.products as Product[]).sort((a, b) => a.price - b.price);
+/** Poll the status endpoint until the job is no longer pending/running. */
+async function pollJob(
+  jobId: string,
+  signal: AbortSignal,
+  timeoutMs: number,
+  onPoll?: () => void
+): Promise<JobStatus> {
+  const start = Date.now();
+  const interval = 2000;
+  while (true) {
+    if (signal.aborted) throw new DOMException('aborted', 'AbortError');
+    if (Date.now() - start > timeoutMs) {
+      throw new Error('timeout');
+    }
+    onPoll?.();
+    const res = await fetch(`/api/scrape/status/${jobId}`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal,
+    });
+    if (!res.ok) {
+      throw new Error(`status ${res.status}`);
+    }
+    const data = (await res.json()) as JobStatus;
+    if (data.status === 'complete' || data.status === 'failed') {
+      return data;
+    }
+    await new Promise<void>((r) => setTimeout(r, interval));
+  }
 }
 
 /** Score and filter products against a query string */
@@ -93,13 +140,24 @@ export function useScraper(initialQuery: string = '') {
     setHasSearched(true);
 
     try {
-      const result = await fetchProducts(query, controller.signal);
+      const jobId = await submitJob(query, controller.signal);
       if (requestId !== requestIdRef.current) return;
-      setProducts(result);
+      const result = await pollJob(jobId, controller.signal, 90_000);
+      if (requestId !== requestIdRef.current) return;
+
+      if (result.status === 'failed') {
+        setError(result.error || 'فشل البحث. حاول مرة أخرى.');
+        return;
+      }
+
+      const list = (result.products ?? []).sort(
+        (a, b) => a.price - b.price
+      );
+      setProducts(list);
       if (
         status === 'unauthenticated' &&
         !savePromptFiredRef.current &&
-        result.length > 0
+        list.length > 0
       ) {
         savePromptFiredRef.current = true;
         fireSavePrompt();
@@ -107,7 +165,12 @@ export function useScraper(initialQuery: string = '') {
     } catch (err) {
       if (controller.signal.aborted || requestId !== requestIdRef.current) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      setError('تعذر جلب النتائج. حاول مرة أخرى لاحقاً.');
+      if (err instanceof Error && err.message === 'timeout') {
+        setError('البحث استغرق وقت طويل. حاول مرة أخرى.');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'API error';
+      setError(msg || 'تعذر جلب النتائج. حاول مرة أخرى لاحقاً.');
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
