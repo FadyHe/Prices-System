@@ -71,29 +71,38 @@ For local dev, copy `.env.local.example` to `.env.local` and fill these in.
    - `WEBHOOK_URL` — your deployed Vercel URL + `/api/scrape/webhook`,
      e.g. `https://qarinha.vercel.app/api/scrape/webhook`. For local dev use
      a tunnel like ngrok and update the variable.
-3. **Create the fine-grained PAT** used by Vercel to trigger the workflow.
+3. **Create a CLASSIC PAT** used by Vercel to trigger the workflow.
+
+   > **Important — why classic, not fine-grained:** the repository_dispatch
+   > endpoint (`POST /repos/{owner}/{repo}/dispatches`) **does not accept
+   > fine-grained personal access tokens**. It returns
+   > `403 Resource not accessible by personal access token` even if the
+   > token has `Actions: Read and write` on the repo. You must use a
+   > **classic PAT with the `repo` scope**, OR a GitHub App installation
+   > token (more setup; classic PAT is simpler here).
+   >
+   > If you want to stay closer to least-privilege without going full
+   > GitHub App, fine-grained PATs work for every other call in this
+   > flow except the dispatch trigger itself.
+
    Exact steps:
 
-   1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
-   2. Click **Generate new token**.
-   3. **Token name**: e.g. `qarinha-vercel-dispatch`.
-   4. **Resource owner**: your own user (or the org that owns the repo).
-   5. **Expiration**: 90 days (rotate it; never set "No expiration").
-   6. **Repository access**: choose **Only select repositories**, then pick the
-      single repo that hosts `.github/workflows/scrape.yml`. This is the
-      least-privilege part — it cannot dispatch events on any other repo.
-   7. **Permissions → Repository permissions**:
-      - **Actions**: **Read and write** — required to call
-        `POST /repos/{owner}/{repo}/dispatches`. Leave every other
-        permission set to "No access" (Contents, Issues, Pull requests, etc.).
-   8. Click **Generate token**, copy the value, and paste it as `GITHUB_TOKEN`
+   1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**.
+   2. Click **Generate new token → Generate new token (classic)**.
+   3. **Note**: e.g. `qarinha-vercel-dispatch`.
+   4. **Expiration**: 90 days (rotate; never "No expiration").
+   5. **Scopes**: only check **`repo`** (Full control of private repositories).
+      This is the only scope needed for `POST /repos/{owner}/{repo}/dispatches`.
+      Leave every other scope unchecked.
+   6. Click **Generate token**, copy the value, and paste it as `GITHUB_TOKEN`
       in your Vercel project (and in `.env.local` for local dev).
 
-   The PAT can only trigger workflows on the one repo you selected. It cannot
-   read or modify code, issues, packages, or any other resource.
+   The PAT can only act on repositories the owning user can access. It will
+   fail (404) on repos you can't see, and a leaked token can be revoked from
+   the same settings page.
 
 4. **Vercel env vars** (project → Settings → Environment Variables):
-   - `GITHUB_TOKEN` = the PAT from step 3.
+   - `GITHUB_TOKEN` = the classic PAT from step 3.
    - `GITHUB_REPO`  = `your-username/your-repo`.
    - `WEBHOOK_SECRET` = the same value as the GitHub repo secret.
 
