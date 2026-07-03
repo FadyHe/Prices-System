@@ -4,7 +4,8 @@ import { scrapeAmazon } from './amazon';
 import { scrapeJumia } from './jumia';
 import { scrapeNoon } from './noon';
 
-const MAX_PER_SITE = 200;
+const MAX_PER_SITE = 30;
+const PER_SITE_TIMEOUT_MS = 75_000;
 
 async function applyStealth(page: Page) {
   await page.setViewport({ width: 1280, height: 900 });
@@ -16,6 +17,16 @@ async function applyStealth(page: Page) {
   await page.setExtraHTTPHeaders({
     'Accept-Language': 'ar-EG,ar;q=0.9,en;q=0.8',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  });
+
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    const type = req.resourceType();
+    if (type === 'image' || type === 'font' || type === 'media') {
+      req.abort().catch(() => undefined);
+    } else {
+      req.continue().catch(() => undefined);
+    }
   });
 
   await page.evaluateOnNewDocument(() => {
@@ -32,11 +43,42 @@ async function applyStealth(page: Page) {
   });
 }
 
-function randomDelay(min = 5000, max = 10000): Promise<void> {
-  const ms = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise((r) => setTimeout(r, ms));
+/** Race a scraper against a hard timeout so one slow site cannot block the run. */
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+  });
+  try {
+    return (await Promise.race([p, timeout])) as T;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
+async function runOne(
+  name: string,
+  fn: (page: Page, query: string, max: number) => Promise<Product[]>,
+  browser: import('puppeteer').Browser,
+  query: string,
+  max: number
+): Promise<Product[]> {
+  const page = await browser.newPage();
+  try {
+    await applyStealth(page);
+    return await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
+  } catch (err) {
+    console.error(`[scrape] ${name} failed`, err);
+    return [];
+  } finally {
+    await page.close().catch(() => undefined);
+  }
+}
+
+/** Sequential — kept for backwards compat / debugging. */
 export async function runAllScrapers(query: string): Promise<Product[]> {
   const browser = await puppeteer.launch({
     headless: true,
@@ -45,25 +87,12 @@ export async function runAllScrapers(query: string): Promise<Product[]> {
   });
 
   try {
-    const all: Product[] = [];
-    for (const { name, fn } of [
-      { name: 'Amazon', fn: scrapeAmazon },
-      { name: 'Jumia', fn: scrapeJumia },
-      { name: 'Noon', fn: scrapeNoon },
-    ] as const) {
-      const page = await browser.newPage();
-      try {
-        await applyStealth(page);
-        const res = await fn(page, query, MAX_PER_SITE);
-        all.push(...res);
-      } catch (err) {
-        console.error(`[scrape] ${name} failed`, err);
-      } finally {
-        await page.close();
-      }
-      await randomDelay();
-    }
-    return all;
+    const results = await Promise.all([
+      runOne('Amazon', scrapeAmazon, browser, query, MAX_PER_SITE),
+      runOne('Jumia', scrapeJumia, browser, query, MAX_PER_SITE),
+      runOne('Noon', scrapeNoon, browser, query, MAX_PER_SITE),
+    ]);
+    return results.flat();
   } finally {
     await browser.close();
   }

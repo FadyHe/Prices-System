@@ -142,7 +142,7 @@ export function useScraper(initialQuery: string = '') {
     try {
       const jobId = await submitJob(query, controller.signal);
       if (requestId !== requestIdRef.current) return;
-      const result = await pollJob(jobId, controller.signal, 90_000);
+      const result = await pollJob(jobId, controller.signal, 180_000);
       if (requestId !== requestIdRef.current) return;
 
       if (result.status === 'failed') {
