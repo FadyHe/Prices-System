@@ -1,8 +1,19 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import AuthForm from '@/components/AuthForm';
 
-export const metadata = {
-  title: 'إنشاء حساب — قارنها',
+export const metadata: Metadata = {
+  title: 'إنشاء حساب',
+  description:
+    'اعمل حساب في قارنها مجاناً وقارن أسعار المنتجات من Amazon و Noon و Jumia.',
+  alternates: { canonical: '/register' },
+  openGraph: {
+    title: 'إنشاء حساب — قارنها',
+    description:
+      'اعمل حساب في قارنها مجاناً وقارن أسعار المنتجات من Amazon و Noon و Jumia.',
+    url: '/register',
+  },
+  robots: { index: false, follow: true },
 };
 
 export default function RegisterPage() {

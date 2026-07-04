@@ -7,6 +7,7 @@ import { checkAndRecord } from '@/lib/quota';
 import { connectDB } from '@/lib/db/mongodb';
 import { ScrapeJob } from '@/lib/db/models';
 import { triggerWorkflowDispatch } from '@/lib/github/dispatch';
+import { cacheGet, cacheSet, normalizeForCache } from '@/lib/search/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,13 +48,13 @@ export async function POST(req: Request) {
 
   const quota = await checkAndRecord({ userId, ip, plan });
   if (!quota.allowed) {
-    await audit({
+    audit({
       userId,
       ip,
       action: 'scrape.quota_exceeded',
       query,
       meta: { reason: quota.reason, plan },
-    });
+    }).catch(() => {});
     const message =
       quota.reason === 'day'
         ? 'وصلت للحد اليومي. حاول بكره أو رقّي حسابك.'
@@ -80,24 +81,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const jobId = newJobId();
-  await connectDB();
-  await ScrapeJob.create({
-    jobId,
-    query,
-    status: 'pending',
-    userId,
-    ip,
-    plan,
-  });
+  const cacheKey = normalizeForCache(query);
+  const cachedJobId = cacheGet<string>(`query:${cacheKey}`);
+  if (cachedJobId) {
+    return Response.json({
+      jobId: cachedJobId,
+      status: 'pending',
+      cached: true,
+      quota: { remaining: quota.remaining, limit: quota.limit },
+    });
+  }
 
-  await audit({
-    userId,
-    ip,
-    action: 'scrape.success',
-    query,
-    meta: { plan, jobId, quota: quota.remaining, mode: 'github-actions' },
-  });
+  const jobId = newJobId();
+  cacheSet(`query:${cacheKey}`, jobId, 60_000);
 
   try {
     await triggerWorkflowDispatch({
@@ -108,7 +104,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error('[scrape] dispatch failed', err);
-    await ScrapeJob.updateOne(
+    ScrapeJob.updateOne(
       { jobId },
       {
         $set: {
@@ -117,12 +113,33 @@ export async function POST(req: Request) {
           completedAt: new Date(),
         },
       }
-    );
+    ).catch(() => {});
     return Response.json(
       { error: 'failed to start scraper job' },
       { status: 502 }
     );
   }
+
+  connectDB()
+    .then(() =>
+      ScrapeJob.create({
+        jobId,
+        query,
+        status: 'pending',
+        userId,
+        ip,
+        plan,
+      })
+    )
+    .catch((err) => console.error('[scrape] persist failed', err));
+
+  audit({
+    userId,
+    ip,
+    action: 'scrape.success',
+    query,
+    meta: { plan, jobId, quota: quota.remaining, mode: 'github-actions' },
+  }).catch(() => {});
 
   return Response.json({
     jobId,

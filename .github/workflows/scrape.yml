@@ -18,7 +18,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 7
     env:
       QUERY: ${{ github.event.client_payload.query || inputs.query }}
       JOB_ID: ${{ github.event.client_payload.jobId || inputs.jobId }}
@@ -51,6 +51,10 @@ jobs:
       - name: Install scraper-service dependencies
         working-directory: scraper-service
         run: npm ci || npm install
+
+      - name: Build scraper-service
+        working-directory: scraper-service
+        run: npm run build
 
       - name: Install Puppeteer Chrome (skipping Chromium download)
         working-directory: scraper-service

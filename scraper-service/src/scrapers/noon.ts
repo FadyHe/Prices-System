@@ -1,50 +1,6 @@
 import { Page } from 'puppeteer';
 import { Product } from '../types';
 
-async function scrollAndWaitForProducts(page: Page, maxScrolls = 10) {
-  let previousCount = 0;
-  let scrollAttempts = 0;
-  let noNewProductsCount = 0;
-
-  while (scrollAttempts < maxScrolls && noNewProductsCount < 3) {
-    const currentCount = await page.evaluate(() => {
-      return document.querySelectorAll('[data-qa="plp-product-box"]').length;
-    });
-
-    console.log(`[Noon] Scroll ${scrollAttempts + 1}: Found ${currentCount} products`);
-
-    if (currentCount === previousCount) {
-      noNewProductsCount++;
-    } else {
-      noNewProductsCount = 0;
-    }
-
-    previousCount = currentCount;
-
-    await page.evaluate(async () => {
-      window.scrollBy(0, window.innerHeight);
-      const products = Array.from(document.querySelectorAll('[data-qa="plp-product-box"]'));
-      if (products.length > 0) {
-        const lastProduct = products[products.length - 1];
-        lastProduct.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    });
-
-    await new Promise(r => setTimeout(r, 2000));
-
-    if (scrollAttempts % 2 === 0) {
-      await page.evaluate(() => window.scrollBy(0, -100));
-      await new Promise(r => setTimeout(r, 500));
-      await page.evaluate(() => window.scrollBy(0, 200));
-      await new Promise(r => setTimeout(r, 1500));
-    }
-
-    scrollAttempts++;
-  }
-
-  console.log(`[Noon] Finished scrolling. Total products visible: ${previousCount}`);
-}
-
 export async function scrapeNoon(
   page: Page,
   query: string,
@@ -55,7 +11,7 @@ export async function scrapeNoon(
   console.log('[Noon] Navigating to:', url);
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     console.log('[Noon] Page loaded');
   } catch (err) {
     console.error('[Noon] Navigation failed:', err);
@@ -70,7 +26,7 @@ export async function scrapeNoon(
   let selectorFound = false;
   for (const selector of selectors) {
     try {
-      await page.waitForSelector(selector, { timeout: 10000 });
+      await page.waitForSelector(selector, { timeout: 6000 });
       console.log(`[Noon] Found products with selector: ${selector}`);
       selectorFound = true;
       break;
@@ -84,12 +40,9 @@ export async function scrapeNoon(
     return [];
   }
 
-  await new Promise(r => setTimeout(r, 2000));
-
-  const scrollsNeeded = Math.ceil(maxProducts / 5);
-  await scrollAndWaitForProducts(page, Math.max(scrollsNeeded, 5));
-
-  await new Promise(r => setTimeout(r, 2000));
+  // Quick scroll to load more products
+  await page.evaluate(() => window.scrollBy(0, window.innerHeight));
+  await new Promise(r => setTimeout(r, 500));
 
   const products = await page.evaluate((max) => {
     const results: Record<string, unknown>[] = [];

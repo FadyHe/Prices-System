@@ -4,8 +4,8 @@ import { scrapeAmazon } from './amazon';
 import { scrapeJumia } from './jumia';
 import { scrapeNoon } from './noon';
 
-const MAX_PER_SITE = 30;
-const PER_SITE_TIMEOUT_MS = 75_000;
+const MAX_PER_SITE = 15;
+const PER_SITE_TIMEOUT_MS = 30_000;
 
 async function applyStealth(page: Page) {
   await page.setViewport({ width: 1280, height: 900 });
@@ -78,12 +78,12 @@ async function runOne(
   }
 }
 
-/** Sequential — kept for backwards compat / debugging. */
+/** Run scrapers with aggressive concurrency and early exit on timeout. */
 export async function runAllScrapers(query: string): Promise<Product[]> {
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    timeout: 90_000,
+    timeout: 60_000,
   });
 
   try {

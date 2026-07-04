@@ -1,9 +1,23 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { Search, Percent, ShoppingBag, Zap, ShieldCheck, TrendingDown, ArrowLeft, Sparkles, Store } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import HowItWorksCards from '@/components/HowItWorksCards';
 import InputSys from '@/components/InputSys';
+
+export const metadata: Metadata = {
+  title: 'قارنها — قارن أسعار المنتجات من Amazon و Noon و Jumia',
+  description:
+    'قارن أسعار أي منتج من Amazon.eg و Noon و Jumia في ثوانٍ. نجمع لك أفضل العروض ونرتبها من الأرخص للأغلى لتوفير فلوسك.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'قارنها — قارن أسعار المنتجات من Amazon و Noon و Jumia',
+    description:
+      'قارن أسعار أي منتج من Amazon.eg و Noon و Jumia في ثوانٍ. نجمع لك أفضل العروض ونرتبها من الأرخص للأغلى.',
+    url: '/',
+  },
+};
 
 const FEATURES = [
   {

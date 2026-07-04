@@ -1,8 +1,17 @@
 import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import AuthForm from '@/components/AuthForm';
 
-export const metadata = {
-  title: 'تسجيل الدخول — قارنها',
+export const metadata: Metadata = {
+  title: 'تسجيل الدخول',
+  description: 'سجّل دخولك في قارنها عشان تحفظ نتائج البحث والمنتجات المفضلة.',
+  alternates: { canonical: '/login' },
+  openGraph: {
+    title: 'تسجيل الدخول — قارنها',
+    description: 'سجّل دخولك في قارنها عشان تحفظ نتائج البحث والمنتجات المفضلة.',
+    url: '/login',
+  },
+  robots: { index: false, follow: true },
 };
 
 export default function LoginPage() {

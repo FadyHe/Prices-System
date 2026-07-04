@@ -43,13 +43,13 @@ function randomDelay(min = 2000, max = 4000): Promise<void> {
 export async function scrapeAmazon(
   page: Page,
   query: string,
-  maxProducts = 15
+  maxProducts = 15,
+  maxPages: number = 2
 ): Promise<Product[]> {
 
-  const allProducts: Product[] = [];
-  const maxPages = 3;
+const allProducts: Product[] = [];
 
-  for (let currentPage = 1; currentPage <= maxPages; currentPage++) {
+   for (let currentPage = 1; currentPage <= maxPages; currentPage++) {
     if (allProducts.length >= maxProducts) break;
 
     const url =
@@ -57,13 +57,13 @@ export async function scrapeAmazon(
 
     console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
 
-    try {
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
-      console.log(`[Amazon] Page ${currentPage} loaded`);
-    } catch (err) {
-      console.error('[Amazon] Navigation failed:', err);
-      break;
-    }
+try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    console.log(`[Amazon] Page ${currentPage} loaded`);
+  } catch (err) {
+    console.error('[Amazon] Navigation failed:', err);
+    break;
+  }
 
     const captcha = await isCaptchaPage(page);
     if (captcha) {
@@ -108,8 +108,8 @@ export async function scrapeAmazon(
       break;
     }
 
-    await autoScroll(page);
-    await new Promise(r => setTimeout(r, 1500));
+await autoScroll(page);
+     await new Promise(r => setTimeout(r, 500));
 
     const products = await page.evaluate((max) => {
       function convertArabicToWestern(str: string): string {

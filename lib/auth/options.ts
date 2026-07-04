@@ -77,22 +77,32 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = (user as { id?: string }).id;
-        token.plan = 'free';
-        token.emailVerified = true;
-      } else if (token.id) {
-        const fresh = await User.findById(token.id)
-          .select('plan emailVerified')
-          .lean();
-        if (fresh) {
-          token.plan = fresh.plan ?? 'free';
-          token.emailVerified = !!fresh.emailVerified;
-        }
-      }
-      return token;
-    },
+async jwt({ token, user, account }) {
+       if (user) {
+         if (user.id) {
+           token.id = user.id;
+         } else if (user.email) {
+           await connectDB();
+           const existing = await User.findOne({ email: user.email.toLowerCase() })
+             .select('_id')
+             .lean();
+           if (existing?._id) token.id = existing._id.toString();
+         }
+         token.plan = 'free';
+         token.emailVerified = true;
+       } else if (token?.email) {
+         await connectDB();
+         const fresh = await User.findOne({ email: (token.email as string).toLowerCase() })
+           .select('plan emailVerified')
+           .lean();
+         if (fresh?._id) {
+           token.id = fresh._id.toString();
+           token.plan = fresh.plan ?? 'free';
+           token.emailVerified = !!fresh.emailVerified;
+         }
+       }
+       return token;
+     },
     async session({ session, token }) {
       if (session.user) {
         if (token.id) (session.user as { id?: string }).id = token.id as string;

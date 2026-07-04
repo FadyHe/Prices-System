@@ -20,15 +20,22 @@ export async function GET(_req: Request, ctx: RouteParams) {
     return Response.json({ error: 'job not found' }, { status: 404 });
   }
 
-  return Response.json({
-    jobId: job.jobId,
-    query: job.query,
-    status: job.status,
-    totalScraped: job.totalScraped ?? 0,
-    count: job.count ?? 0,
-    error: job.error ?? null,
-    createdAt: job.createdAt,
-    completedAt: job.completedAt ?? null,
-    products: job.status === 'complete' ? job.products ?? [] : [],
-  });
+  return Response.json(
+    {
+      jobId: job.jobId,
+      query: job.query,
+      status: job.status,
+      totalScraped: job.totalScraped ?? 0,
+      count: job.count ?? 0,
+      error: job.error ?? null,
+      createdAt: job.createdAt,
+      completedAt: job.completedAt ?? null,
+      products: job.status === 'complete' ? job.products ?? [] : [],
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, must-revalidate',
+      },
+    }
+  );
 }

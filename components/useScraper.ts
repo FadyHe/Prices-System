@@ -55,7 +55,8 @@ async function pollJob(
   onPoll?: () => void
 ): Promise<JobStatus> {
   const start = Date.now();
-  const interval = 2000;
+  let interval = 800;
+  const maxInterval = 2500;
   while (true) {
     if (signal.aborted) throw new DOMException('aborted', 'AbortError');
     if (Date.now() - start > timeoutMs) {
@@ -75,6 +76,7 @@ async function pollJob(
       return data;
     }
     await new Promise<void>((r) => setTimeout(r, interval));
+    interval = Math.min(maxInterval, Math.floor(interval * 1.3));
   }
 }
 
