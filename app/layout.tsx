@@ -1,10 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { Cairo } from 'next/font/google';
+import { Cairo, Aref_Ruqaa } from 'next/font/google';
 
 import Footer from '@/components/Footer'
 import './globals.css'
 import Header from '@/components/Header'
-import LightRays from '@/components/LightRays'
 import Providers from '@/components/Providers'
 import { SaveSearchPrompt } from '@/components/SaveSearchPrompt'
 
@@ -19,12 +18,21 @@ const cairo = Cairo({
   preload: true,
 });
 
+/* Handwritten ledger voice — for the circled prices & journal copy */
+const arefRuqaa = Aref_Ruqaa({
+  subsets: ['arabic'],
+  weight: ['400', '700'],
+  display: 'swap',
+  variable: '--font-hand',
+  preload: true,
+});
+
 export const viewport: Viewport = {
-  themeColor: '#0f172a',
+  themeColor: '#f7f2e7',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  colorScheme: 'dark',
+  colorScheme: 'light',
 };
 
 export const metadata: Metadata = {
@@ -107,28 +115,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl">
-<body className={cairo.variable}>
+<body className={`${cairo.variable} ${arefRuqaa.variable}`}>
          <Providers>
            <Header />
-           <div className="fixed inset-0 z-[-1] w-screen h-screen" suppressHydrationWarning>
-             <LightRays
-               raysOrigin="top-center-offset"
-               raysColor="#777777"
-               raysSpeed={1}
-               lightSpread={1.5}
-               rayLength={1.8}
-               followMouse={true}
-               mouseInfluence={0.09}
-               noiseAmount={0.1}
-               distortion={0}
-               className="custom-rays"
-               pulsating={false}
-               fadeDistance={1}
-               saturation={1}
-             />
-          </div>
           <main className="flex-1">
-            {children}
+            {/* =============================================================================
+        THESIS: The whole surface is a family price-ledger, the دفتر that Egyptian homes
+        keep by hand to beat the high street. It refuses the dark-glass SaaS dashboard —
+        instead every page is a warm ivory ruled notebook page: prices written in ink,
+        the cheapest offer circled in one red pen line, stores stamped in true colors.
+        OWN-WORLD: ivory paper with faint ruled ledger lines and a red margin rule; ink
+        text in graphite/ink-blue; exactly one signal deal-red (#c4391f) for every
+        circled best-price and the primary search action; handwritten Arabic (Aref Ruqaa)
+        for the ledger's own words beside a crisp humanist UI sans (Cairo); paper-grain
+        cards, flat at rest, lifted on interaction.
+        STORY: A shopper types a product name into the ruled column, sees every store's
+        real color, and the cheapest offer ringed in red like a careful bargain noted in
+        the family book. Calm, honest, home.
+        FIRST VIEWPORT: the landing page is the open ledger — ruled red-margin page, the
+        search in the writing column, a handwritten sample entry with the Amazon.eg price
+        circled "الأرخص", store marks in true colors, CTA in deal-red.
+        FORM: direction roll index 4 = دفتر البيت (family ledger), seed key 7748c9cc.
+        FINISH: unreviewed and undocumented is unfinished; this build is closed and DESIGN.md
+        written from the built world.
+      ============================================================================= */}
+      {children}
           </main>
           <Footer />
           <SaveSearchPrompt />

@@ -125,7 +125,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
           type="button"
           onClick={onGoogle}
           disabled={googleLoading}
-          className="btn w-full justify-center bg-white text-gray-800 hover:bg-white/90 font-semibold"
+          className="btn w-full justify-center bg-white text-gray-800 hover:bg-gray-50 font-semibold border border-[var(--paper-border-soft)]"
         >
           {googleLoading ? (
             <Loader2 size={16} className="animate-spin" />
@@ -136,9 +136,9 @@ export default function AuthForm({ mode }: AuthFormProps) {
         </button>
 
         <div className="flex items-center gap-3 text-xs text-muted">
-          <span className="flex-1 h-px bg-white/10" />
+          <span className="flex-1 h-px bg-[var(--paper-border-soft)]" />
           أو
-          <span className="flex-1 h-px bg-white/10" />
+          <span className="flex-1 h-px bg-[var(--paper-border-soft)]" />
         </div>
 
         <form onSubmit={onSubmit} className="flex flex-col gap-4">

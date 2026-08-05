@@ -48,14 +48,14 @@ export function SaveSearchPrompt() {
       role="dialog"
       aria-modal="true"
       aria-label="احفظ البحث"
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center px-4 sm:pb-0 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center px-4 sm:pb-0 bg-[#2a241a]/55 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) dismiss();
       }}
     >
-      <div className="w-full sm:max-w-md glass gradient-border rounded-2xl p-6 shadow-2xl">
+      <div className="w-full sm:max-w-md ledger-paper rounded-2xl p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex items-center gap-2 text-purple">
+          <div className="flex items-center gap-2 text-deal">
             <Bookmark size={18} />
             <span className="text-sm font-semibold">نصيحة سريعة</span>
           </div>

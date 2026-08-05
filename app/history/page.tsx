@@ -83,9 +83,7 @@ export default function HistoryPage() {
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
         {/* Hero */}
         <section className="glass gradient-border relative overflow-hidden rounded-3xl p-8 md:p-10">
-          <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-purple/20 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
-
+          
           <div className="relative z-10 flex flex-col gap-6">
             <div className="flex items-center gap-3">
               <span className="pill">
@@ -141,7 +139,7 @@ export default function HistoryPage() {
                 'btn text-sm py-2 px-4',
                 confirmClear
                   ? 'bg-error/20 text-error hover:bg-error/30'
-                  : 'bg-bg-secondary text-secondary hover:text-white'
+                  : 'bg-bg-secondary text-secondary hover:text-deal'
               )}
             >
               <Trash2 size={16} />
@@ -224,7 +222,7 @@ export default function HistoryPage() {
                       'shrink-0 p-2 rounded-lg transition-colors',
                       entry.pinned
                         ? 'bg-purple/20 text-purple hover:bg-purple/30'
-                        : 'text-muted hover:text-primary hover:bg-white/5'
+                        : 'text-muted hover:text-primary hover:bg-bg-card'
                     )}
                   >
                     {entry.pinned ? <Pin size={16} /> : <PinOff size={16} />}
@@ -232,7 +230,7 @@ export default function HistoryPage() {
                 </div>
 
                 {entry.bestPrice !== undefined && entry.bestSource && (
-                  <div className="flex items-center justify-between rounded-xl bg-bg-secondary/50 px-3 py-2.5 border border-white/5">
+                  <div className="flex items-center justify-between rounded-xl bg-bg-secondary/50 px-3 py-2.5 border border-[var(--paper-border-soft)]">
                     <div className="flex items-center gap-2 text-xs text-secondary">
                       <Sparkles size={12} className="text-purple" />
                       <span>أفضل سعر</span>
@@ -244,7 +242,7 @@ export default function HistoryPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-white/5">
+                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-[var(--paper-border-soft)]">
                   <button
                     type="button"
                     onClick={() => handleRerun(entry.query)}
@@ -309,7 +307,7 @@ function StatCard({
   accent?: 'purple' | 'blue';
 }) {
   return (
-    <div className="rounded-xl bg-bg-secondary/50 border border-white/5 p-4">
+    <div className="rounded-xl bg-bg-secondary/50 border border-[var(--paper-border-soft)] p-4">
       <span className="text-xs text-muted block">{label}</span>
       <span
         className={cn(

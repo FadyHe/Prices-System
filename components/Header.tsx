@@ -154,10 +154,10 @@ function Header() {
       >
         <div
           className={cn(
-            'border-b transition-colors duration-300',
+            'border-b transition-all duration-300',
             scrolled
-              ? 'bg-bg-primary/80 backdrop-blur-xl border-white/10 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)]'
-              : 'bg-bg-primary/40 backdrop-blur-md border-transparent'
+              ? 'bg-bg-primary/90 backdrop-blur-xl border-[var(--paper-border)] shadow-[0_8px_26px_-14px_rgba(60,45,20,0.4)]'
+              : 'bg-bg-primary/70 backdrop-blur-md border-transparent'
           )}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -169,7 +169,7 @@ function Header() {
 
               {/* Center nav (desktop) */}
               <nav className="hidden md:flex items-center justify-center">
-                <ul className="flex items-center gap-1 p-1 rounded-full bg-white/5 border border-white/10">
+                <ul className="flex items-center gap-1 p-1 rounded-full bg-bg-card border border-[var(--paper-border-soft)]">
                   {NAV_LINKS.map((link) => {
                     const active = isActive(link.href);
                     return (
@@ -179,13 +179,13 @@ function Header() {
                           className={cn(
                             'relative px-4 py-2 text-sm font-medium rounded-full transition-colors duration-200',
                             active
-                              ? 'text-white'
-                              : 'text-secondary hover:text-white'
+                              ? 'text-deal'
+                              : 'text-secondary hover:text-primary'
                           )}
                         >
                           {link.label}
                           {active && (
-                            <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-accent via-purple to-accent" />
+                            <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-deal" />
                           )}
                         </Link>
                       </li>
@@ -203,11 +203,11 @@ function Header() {
                     requestAnimationFrame(() => inputRef.current?.focus());
                   }}
                   aria-label="بحث سريع"
-                  className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full bg-white/5 border border-white/10 text-secondary hover:text-white hover:bg-white/10 transition-colors text-sm"
+                  className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-primary hover:border-deal/50 transition-colors text-sm"
                 >
                   <Search size={15} />
                   <span className="hidden lg:inline">ابحث عن منتج</span>
-                  <kbd className="hidden lg:inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-white/10 text-muted">
+                  <kbd className="hidden lg:inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)] text-muted">
                     ⌘K
                   </kbd>
                 </button>
@@ -226,7 +226,7 @@ function Header() {
                   <Link
                     href="/login"
                     aria-label="تسجيل الدخول"
-                    className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-secondary hover:text-white hover:bg-white/10 transition-colors"
+                    className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-deal hover:border-deal/50 transition-colors"
                   >
                     <LogIn size={16} />
                   </Link>
@@ -237,7 +237,7 @@ function Header() {
                   aria-label={mobileOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
                   aria-expanded={mobileOpen}
                   onClick={() => setMobileOpen((v) => !v)}
-                  className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/10 text-primary hover:bg-white/10 transition-colors"
+                  className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-primary hover:border-deal/40 transition-colors"
                 >
                   {mobileOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
@@ -253,7 +253,7 @@ function Header() {
             mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           )}
         >
-          <div className="bg-bg-primary/95 backdrop-blur-xl border-b border-white/10 px-4 py-4">
+          <div className="bg-bg-primary/95 backdrop-blur-xl border-b border-[var(--paper-border-soft)] px-4 py-4">
             <ul className="flex flex-col gap-1">
               {NAV_LINKS.map((link) => {
                 const active = isActive(link.href);
@@ -265,20 +265,20 @@ function Header() {
                       className={cn(
                         'flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                         active
-                          ? 'bg-purple/15 text-white border border-purple/30'
-                          : 'text-secondary hover:text-white hover:bg-white/5 border border-transparent'
+                          ? 'bg-deal/10 text-deal border border-deal/30'
+                          : 'text-secondary hover:text-primary hover:bg-bg-card border border-transparent'
                       )}
                     >
                       <span>{link.label}</span>
                       {active && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-deal" />
                       )}
                     </Link>
                   </li>
                 );
               })}
             </ul>
-            <div className="flex gap-2 mt-3 pt-3 border-t border-white/5">
+            <div className="flex gap-2 mt-3 pt-3 border-t border-[var(--paper-border-soft)]">
               <button
                 type="button"
                 onClick={() => {
@@ -306,7 +306,7 @@ function Header() {
       <div aria-hidden className="h-16" />
 
       {showVerifyBanner && (
-        <div className="bg-amber-500/15 border-b border-amber-500/30 text-amber-100">
+        <div className="bg-deal/10 border-b border-deal/25 text-deal">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm">
             <MailCheck size={16} className="shrink-0" />
             <span className="flex-1">
@@ -314,7 +314,7 @@ function Header() {
             </span>
             <Link
               href="/login"
-              className="text-amber-200 hover:text-white underline underline-offset-2"
+              className="text-deal hover:text-deal/80 underline underline-offset-2"
             >
               أعد إرسال الرسالة
             </Link>
@@ -322,7 +322,7 @@ function Header() {
               type="button"
               aria-label="إغلاق"
               onClick={() => setBannerDismissed(true)}
-              className="text-amber-200/80 hover:text-white"
+              className="text-deal/80 hover:text-deal"
             >
               <X size={14} />
             </button>
@@ -336,7 +336,7 @@ function Header() {
           role="dialog"
           aria-modal="true"
           aria-label="بحث"
-          className="fixed inset-0 z-[60] flex items-start justify-center pt-24 px-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_150ms_ease-out]"
+          className="fixed inset-0 z-[60] flex items-start justify-center pt-24 px-4 bg-[#2a241a]/55 backdrop-blur-sm animate-[fadeIn_150ms_ease-out]"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setSearchOpen(false);
@@ -344,11 +344,11 @@ function Header() {
             }
           }}
         >
-          <div className="w-full max-w-2xl glass gradient-border rounded-2xl overflow-hidden shadow-2xl">
+          <div className="w-full max-w-2xl ledger-paper rounded-2xl overflow-hidden shadow-2xl">
             <form onSubmit={submitSearch} className="relative">
               <Search
                 size={20}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-purple"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-deal"
               />
               <input
                 ref={inputRef}
@@ -357,7 +357,7 @@ function Header() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onSearchKey}
                 placeholder="ابحث عن منتج (مثل جالكسي اس 24)"
-                className="w-full bg-transparent text-lg text-white placeholder:text-muted pr-12 pl-12 py-5 focus:outline-none"
+                className="w-full bg-transparent text-lg text-primary placeholder:text-muted py-5 focus:outline-none"
                 aria-label="بحث"
               />
               <button
@@ -369,13 +369,13 @@ function Header() {
                 aria-label="إغلاق"
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted hover:text-primary"
               >
-                <kbd className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-white/10">
+                <kbd className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)]">
                   Esc
                 </kbd>
               </button>
             </form>
 
-            <div className="border-t border-white/5 px-4 py-3 flex flex-wrap items-center gap-2">
+            <div className="border-t border-[var(--paper-border-soft)] px-4 py-3 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted flex items-center gap-1">
                 <Sparkles size={12} /> اقتراحات
               </span>
@@ -396,16 +396,16 @@ function Header() {
               ))}
             </div>
 
-            <div className="px-4 py-2 border-t border-white/5 flex items-center justify-between text-[11px] text-muted">
+            <div className="px-4 py-2 border-t border-[var(--paper-border-soft)] flex items-center justify-between text-[11px] text-muted">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-1">
-                  <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-white/10">
+                  <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)]">
                     ↵
                   </kbd>
                   للبحث
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-white/10">
+                  <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)]">
                     Esc
                   </kbd>
                   للإغلاق
@@ -431,18 +431,19 @@ export function Logo() {
       className="group inline-flex items-center gap-2.5 shrink-0"
       aria-label="قارنها — الصفحة الرئيسية"
     >
-      <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-accent to-purple shadow-[0_0_18px_-2px_rgba(139,92,246,0.6)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
+      <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-bg-card border border-[var(--paper-border)] shadow-[var(--shadow-sm)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
+        <span className="absolute inset-0 rounded-xl ring-1 ring-deal/25 ring-offset-0" />
         <Image
           src="/explore-svgrepo-com.svg"
           alt=""
-          width={22}
-          height={22}
-          className="brightness-0 invert"
+          width={20}
+          height={20}
+          className="brightness-0 opacity-80"
         />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="text-lg font-extrabold tracking-tight text-white">
-          قارن<span className="text-purple">ها</span>
+        <span className="text-lg font-extrabold tracking-tight text-primary">
+          قارن<span className="text-deal">ها</span>
         </span>
         <span className="text-[10px] text-muted mt-0.5 hidden sm:block">
           قارن أسعارك في ثوانٍ

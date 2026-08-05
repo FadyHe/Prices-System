@@ -25,20 +25,21 @@ function HowItWorksCards({ title, subTitle, icon, iconcolor }: HowItWorksCardsPr
         {icon}
       </div>
 
-      <div className="how-it-works-icon-wrapper w-14 h-14 rounded-2xl flex items-center justify-center mb-2 group-hover:scale-110 transition-all duration-300 bg-current/10 border border-current/20 shadow-lg shadow-current/10"
-           style={{ 
+      <div className="how-it-works-icon-wrapper w-14 h-14 rounded-2xl flex items-center justify-center mb-2 group-hover:scale-110 transition-all duration-300"
+           style={{
              color: "var(--card-color)",
-             backgroundColor: `rgba(from var(--card-color) r g b / 0.1)`,
-             borderColor: `rgba(from var(--card-color) r g b / 0.2)`
+             backgroundColor: `color-mix(in srgb, var(--card-color) 12%, transparent)`,
+             borderColor: `color-mix(in srgb, var(--card-color) 28%, transparent)`,
+             boxShadow: `0 8px 20px -10px color-mix(in srgb, var(--card-color) 45%, transparent)`
            }}>
         <div className="w-6 h-6">
-           {icon}
+          {icon}
         </div>
       </div>
 
       <div className="flex flex-col gap-2 text-right z-10 transition-transform duration-300">
-        <h3 className="text-xl font-bold text-white leading-tight">{title}</h3>
-        <p className="text-sm text-slate-400 leading-relaxed font-medium">{subTitle}</p>
+        <h3 className="text-xl font-bold text-primary leading-tight">{title}</h3>
+        <p className="text-sm text-secondary leading-relaxed font-medium">{subTitle}</p>
       </div>
     </div>
   );

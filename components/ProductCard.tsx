@@ -68,7 +68,7 @@ export default function ProductCard({ product, isBest, onSave, saved }: ProductC
           </span>
         </div>
 
-        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+        <div className="flex items-center gap-2 pt-2 border-t border-[var(--paper-border-soft)]">
           <a
             href={product.url}
             target="_blank"
@@ -88,7 +88,7 @@ export default function ProductCard({ product, isBest, onSave, saved }: ProductC
                 'btn shrink-0 px-3',
                 saved
                   ? 'bg-success/20 text-success cursor-default'
-                  : 'bg-bg-secondary text-secondary hover:text-white hover:bg-bg-card-hover'
+                  : 'bg-bg-secondary text-secondary hover:text-deal hover:bg-bg-card-hover'
               )}
             >
               <BookmarkPlus size={16} />
