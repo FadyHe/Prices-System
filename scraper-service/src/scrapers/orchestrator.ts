@@ -29,6 +29,14 @@ async function applyStealth(page: Page) {
     }
   });
 
+  // esbuild/tsx emits a __name helper for named functions. puppeteer's page.evaluate
+  // serializes callback source and runs it in the page, where that helper is undefined,
+  // so define a no-op polyfill on every new document to keep it present.
+  await page.evaluateOnNewDocument(() => {
+    (globalThis as any).__name =
+      globalThis.__name || ((f: any, _name: string) => f);
+  });
+
   await page.evaluateOnNewDocument(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
     (window as unknown as { chrome: { runtime: unknown } }).chrome = { runtime: {} };
