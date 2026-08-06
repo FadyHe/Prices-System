@@ -186,8 +186,27 @@ async function launchBrowser(): Promise<Browser> {
     const mod = await import('@sparticuz/chromium');
     const chromium = mod.default || mod;
     const puppeteerCore = await import('puppeteer-core');
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // Next/Turbopack may relocate chromium's bin/ to the function's root.
+    // Resolve the directory explicitly and fall back to the module default.
+    let binDir = '';
+    try {
+      const cwd = process.cwd();
+      const candidates = [
+        path.join(cwd, 'node_modules/@sparticuz/chromium/bin'),
+        path.join(cwd, '.next/server/chunks/node_modules/@sparticuz/chromium/bin'),
+        path.join(cwd, '.next/server/node_modules/@sparticuz/chromium/bin'),
+      ];
+      binDir = candidates.find((c) => fs.existsSync(path.join(c, 'chromium.br'))) ?? '';
+    } catch {
+      /* fall through */
+    }
+    const executablePath = binDir ? await chromium.executablePath(binDir) : await chromium.executablePath();
+
     return puppeteerCore.launch({
-      executablePath: await chromium.executablePath(),
+      executablePath,
       headless: true,
       args: (chromium.args || []).concat(COMMON_ARGS),
       timeout: 30_000,
