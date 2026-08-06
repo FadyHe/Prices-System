@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { runAllScrapers } from './scrapers/orchestrator';
 import { normalizeProductName } from './search/normalize';
 import { scoreProduct } from './search/score';
+import { MIN_RELEVANCE } from './search/min-relevance';
 import { Product } from './types';
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -46,10 +47,9 @@ app.post('/scrape', requireBearer, async (req: Request, res: Response) => {
   }
 
   try {
-    const raw = await runAllScrapers(query);
+    const { products: raw, failures } = await runAllScrapers(query);
 
     const { tokens: queryTokens } = normalizeProductName(query);
-    const MIN_RELEVANCE = 0.3;
 
     const filtered = raw
       .map((p: Product) => {
@@ -65,6 +65,7 @@ app.post('/scrape', requireBearer, async (req: Request, res: Response) => {
       totalScraped: raw.length,
       count: filtered.length,
       products: filtered,
+      failures,
     });
   } catch (err) {
     console.error('[scraper-service] /scrape failed', err);

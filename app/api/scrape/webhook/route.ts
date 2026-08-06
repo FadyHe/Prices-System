@@ -24,6 +24,13 @@ interface WebhookBody {
   totalScraped?: unknown;
   count?: unknown;
   error?: unknown;
+  failures?: unknown;
+}
+
+interface SourceFailure {
+  site: string;
+  reason: string;
+  detail?: string;
 }
 
 function asString(v: unknown): string | null {
@@ -32,6 +39,16 @@ function asString(v: unknown): string | null {
 function asNumber(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
+function asFailureArray(v: unknown): SourceFailure[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(
+    (f): f is SourceFailure =>
+      !!f && typeof f === 'object' &&
+      typeof (f as SourceFailure).site === 'string' &&
+      typeof (f as SourceFailure).reason === 'string'
+  );
+}
+
 function asProductArray(v: unknown): Product[] {
   if (!Array.isArray(v)) return [];
   return v.filter(
@@ -99,6 +116,7 @@ export async function POST(req: Request) {
   const products = asProductArray(body.products);
   const totalScraped = asNumber(body.totalScraped) ?? products.length;
   const count = asNumber(body.count) ?? products.length;
+  const failures = asFailureArray(body.failures);
 
   await ScrapeJob.updateOne(
     { jobId },
@@ -108,6 +126,7 @@ export async function POST(req: Request) {
         products,
         totalScraped,
         count,
+        failures,
         completedAt: new Date(),
       },
     }

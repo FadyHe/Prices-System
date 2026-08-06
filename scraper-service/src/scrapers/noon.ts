@@ -1,5 +1,6 @@
 import { Page } from 'puppeteer';
 import { Product } from '../types';
+import path from 'path';
 
 const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
 
@@ -39,6 +40,11 @@ export async function scrapeNoon(
 
   if (!selectorFound) {
     console.error('[Noon] No product selectors found on page');
+    try {
+      const ssPath = path.join(process.cwd(), `noon-empty-debug-${Date.now()}.png`);
+      await page.screenshot({ path: ssPath, fullPage: true });
+      console.log(`[Noon] Debug screenshot saved: ${ssPath}`);
+    } catch {}
     return [];
   }
 
@@ -85,15 +91,15 @@ export async function scrapeNoon(
                   imgEl?.getAttribute('src') || '';
         }
 
-        if (price > 0 && name) {
-          // Keep partial cards: url/image may be missing, the UI only needs
-          // name + price to render a row; discard only if name/price unrecoverable.
+        // Keep partial cards (image may be missing) but SKIP products with
+        // no URL — a card without a link is a dead button in the UI.
+        if (price > 0 && name && url) {
           results.push({
             name,
             price,
             currency: 'EGP',
             seller: 'noon',
-            url: url || '',
+            url,
             image,
             source: 'noon.com'
           });

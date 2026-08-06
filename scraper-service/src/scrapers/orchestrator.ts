@@ -3,7 +3,7 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { Page } from 'puppeteer';
 
 stealthPuppeteer.use(StealthPlugin());
-import { Product } from '../types';
+import { Product, SourceFailure, SourceFailureReason } from '../types';
 import { scrapeAmazon } from './amazon';
 import { scrapeJumia } from './jumia';
 import { scrapeNoon } from './noon';
@@ -77,24 +77,32 @@ async function runOne(
   browser: import('puppeteer').Browser,
   query: string,
   max: number
-): Promise<{ products: Product[]; elapsedMs: number; timedOut: boolean }> {
+): Promise<{ products: Product[]; elapsedMs: number; timedOut: boolean; failure?: SourceFailure }> {
   const page = await browser.newPage();
   const start = Date.now();
   let timedOut = false;
+  let failure: SourceFailure | undefined;
   try {
     await applyStealth(page);
     try {
       const products = await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
-      return { products, elapsedMs: Date.now() - start, timedOut: false };
+      if (products.length === 0) {
+        // Site returned nothing and didn't throw — capture a distinguishable
+        // reason so an empty result isn't confused with "genuinely no products".
+        failure = { site: name, reason: 'empty', detail: 'scraper returned 0 products' };
+      }
+      return { products, elapsedMs: Date.now() - start, timedOut: false, failure };
     } catch (err) {
       // withTimeout rejects -> the site hit its 30s cap.
       if (err instanceof Error && err.message.includes('timed out after')) {
         timedOut = true;
+        failure = { site: name, reason: 'timeout', detail: `${PER_SITE_TIMEOUT_MS}ms cap` };
         console.error(`[scrape] ${name} hit its ${PER_SITE_TIMEOUT_MS}ms timeout`);
       } else {
+        failure = { site: name, reason: 'parse_failed', detail: err instanceof Error ? err.message : String(err) };
         console.error(`[scrape] ${name} failed`, err);
       }
-      return { products: [], elapsedMs: Date.now() - start, timedOut };
+      return { products: [], elapsedMs: Date.now() - start, timedOut, failure };
     }
   } finally {
     await page.close().catch(() => undefined);
@@ -102,7 +110,10 @@ async function runOne(
 }
 
 /** Run scrapers with aggressive concurrency and early exit on timeout. */
-export async function runAllScrapers(query: string): Promise<Product[]> {
+export async function runAllScrapers(query: string): Promise<{
+  products: Product[];
+  failures: SourceFailure[];
+}> {
   const browser = await stealthPuppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -122,7 +133,10 @@ export async function runAllScrapers(query: string): Promise<Product[]> {
       );
     }
     console.log(`[timing] allScrapers total=${Date.now() - totalStart}ms`);
-    return results.flatMap((r) => r.products);
+    const failures = results
+      .map((r) => r.failure)
+      .filter((f): f is SourceFailure => !!f);
+    return { products: results.flatMap((r) => r.products), failures };
   } finally {
     await browser.close();
   }

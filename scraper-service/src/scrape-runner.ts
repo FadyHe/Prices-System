@@ -2,8 +2,7 @@ import { writeFileSync } from 'fs';
 import { runAllScrapers } from './scrapers/orchestrator';
 import { normalizeProductName } from './search/normalize';
 import { scoreProduct } from './search/score';
-
-const MIN_RELEVANCE = 0.3;
+import { MIN_RELEVANCE } from './search/min-relevance';
 
 /** Entry point for the GitHub Actions scrape job (run via `npx tsx src/scrape-runner.ts`). */
 async function main(): Promise<void> {
@@ -15,7 +14,7 @@ async function main(): Promise<void> {
   const jobId = process.env.JOB_ID || 'manual';
 
   const start = Date.now();
-  const raw = await runAllScrapers(query);
+  const { products: raw, failures } = await runAllScrapers(query);
 
   const { tokens: queryTokens } = normalizeProductName(query);
   const scored = raw
@@ -43,6 +42,7 @@ async function main(): Promise<void> {
     totalScraped: raw.length,
     count: filtered.length,
     products: filtered,
+    failures,
   };
   writeFileSync('result.json', JSON.stringify(out));
   console.log(`scraped=${raw.length} kept=${filtered.length} elapsedMs=${Date.now() - start}`);

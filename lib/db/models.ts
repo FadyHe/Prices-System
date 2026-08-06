@@ -115,6 +115,10 @@ const ScrapeJobSchema = new Schema(
     products: { type: [SavedProductSchema], default: [] },
     totalScraped: { type: Number },
     count: { type: Number },
+    failures: {
+      type: [{ site: String, reason: String, detail: String }],
+      default: [],
+    },
     error: { type: String },
     startedAt: { type: Date },
     completedAt: { type: Date },

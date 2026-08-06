@@ -31,6 +31,47 @@ export async function scrapeJumia(
   return scrapeViaPuppeteer(page, query, maxProducts);
 }
 
+/**
+ * Extract the JSON payload that follows 'window.__STORE__=' by scanning
+ * characters with brace-depth tracking (tracking both {} and []), stopping
+ * back at depth 0 after the opening brace. Returns the JSON substring, or
+ * null if the payload can't be balanced (so the caller logs it distinctly).
+ */
+function extractStoreJson(html: string, start: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let k = start;
+  const n = html.length;
+  for (; k < n; k++) {
+    const ch = html[k];
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') {
+      depth--;
+      if (depth === 0) {
+        // include the closing brace
+        return html.slice(start, k + 1);
+      }
+      if (depth < 0) return null;
+    }
+  }
+  return null; // unbalanced / truncated
+}
+
 async function scrapeViaFetch(
   query: string,
   maxProducts: number
@@ -56,12 +97,17 @@ async function scrapeViaFetch(
       console.warn(`[Jumia] No __STORE__ in response (len=${html.length})`);
       return { products: [], status: res.status };
     }
-    const m = html.slice(i + marker.length).match(/\}\s*;\s*<\/script>/);
-    if (!m || m.index === undefined) {
-      console.warn('[Jumia] Could not find end of __STORE__ JSON');
+    // Balanced-brace scan from just past 'window.__STORE__=' so nested
+    // objects/arrays inside the JSON and stray "</script>"-like substrings
+    // within string values don't break extraction. Stop at depth 0 after
+    // the opening '{'. (The old /\}\s*;\s*<\/script>/ regex truncated on
+    // the FIRST '}' which is wrong for any nested payload.)
+    const json = extractStoreJson(html, i + marker.length);
+    if (json === null) {
+      console.warn('[Jumia] Could not find balanced end of __STORE__ JSON');
       return { products: [], status: res.status };
     }
-    const store = JSON.parse(html.slice(i + marker.length, i + marker.length + m.index + 1));
+    const store = JSON.parse(json);
     if (!Array.isArray(store?.products)) return { products: [], status: res.status };
 
     const products = store.products
