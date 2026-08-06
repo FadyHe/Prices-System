@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import { audit, getClientIp } from '@/lib/audit';
 import { checkAndRecord } from '@/lib/quota';
+import { resolveIdentity } from '@/lib/identity';
 import { connectDB } from '@/lib/db/mongodb';
 import { ScrapeJob } from '@/lib/db/models';
 import { triggerWorkflowDispatch } from '@/lib/github/dispatch';
@@ -27,6 +28,7 @@ function newJobId(): string {
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
+  const identity = resolveIdentity(req);
 
   let body: { query?: unknown };
   try {
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   const plan = (session?.user as { plan?: string } | undefined)?.plan ?? 'free';
 
-  const quota = await checkAndRecord({ userId, ip, plan });
+  const quota = await checkAndRecord({ quotaKey: identity.quotaKey, plan });
   if (!quota.allowed) {
     audit({
       userId,
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
           reason: quota.reason,
         },
       },
-      { status: 429 }
+      { status: 429, headers: identity.newCookie ? { 'Set-Cookie': identity.newCookie } : undefined }
     );
   }
 
@@ -150,12 +152,15 @@ export async function POST(req: Request) {
     meta: { plan, jobId, quota: quota.remaining, mode: 'github-actions' },
   }).catch(() => {});
 
-  return Response.json({
-    jobId,
-    status: 'pending',
-    quota: {
-      remaining: quota.remaining,
-      limit: quota.limit,
+  return Response.json(
+    {
+      jobId,
+      status: 'pending',
+      quota: {
+        remaining: quota.remaining,
+        limit: quota.limit,
+      },
     },
-  });
+    { headers: identity.newCookie ? { 'Set-Cookie': identity.newCookie } : undefined }
+  );
 }

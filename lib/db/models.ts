@@ -123,6 +123,22 @@ const ScrapeJobSchema = new Schema(
 ScrapeJobSchema.index({ createdAt: -1 });
 ScrapeJobSchema.index({ status: 1, createdAt: -1 });
 
+// Atomic quota counters: one doc per identity+kind+window. The ceiling is
+// enforced inside findOneAndUpdate (filter count < limit + $inc), so two
+// concurrent requests at the boundary can never exceed it. TTL index on
+// expiresAt sweeps old windows automatically.
+const QuotaWindowSchema = new Schema({
+  key: { type: String, required: true },
+  kind: { type: String, enum: ['hour', 'day'], required: true },
+  window: { type: String, required: true },
+  count: { type: Number, default: 0 },
+  expiresAt: {
+    type: Date,
+    index: { expires: 0 },
+  },
+});
+QuotaWindowSchema.index({ key: 1, kind: 1, window: 1 }, { unique: true });
+
 export type UserDoc = InferSchemaType<typeof UserSchema> & {
   _id: mongoose.Types.ObjectId;
 };
@@ -136,6 +152,9 @@ export type AuditLogDoc = InferSchemaType<typeof AuditLogSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 export type ScrapeJobDoc = InferSchemaType<typeof ScrapeJobSchema> & {
+  _id: mongoose.Types.ObjectId;
+};
+export type QuotaWindowDoc = InferSchemaType<typeof QuotaWindowSchema> & {
   _id: mongoose.Types.ObjectId;
 };
 
@@ -161,6 +180,10 @@ export const AuditLog: Model<AuditLogDoc> =
 export const ScrapeJob: Model<ScrapeJobDoc> =
   (mongoose.models.ScrapeJob as Model<ScrapeJobDoc>) ||
   mongoose.model<ScrapeJobDoc>('ScrapeJob', ScrapeJobSchema);
+
+export const QuotaWindow: Model<QuotaWindowDoc> =
+  (mongoose.models.QuotaWindow as Model<QuotaWindowDoc>) ||
+  mongoose.model<QuotaWindowDoc>('QuotaWindow', QuotaWindowSchema);
 
 export interface SearchHistoryResponse {
   id: string;
