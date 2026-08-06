@@ -69,7 +69,7 @@ const allProducts: Product[] = [];
         console.log(`[Amazon] Page ${currentPage} loaded (attempt ${attempt})`);
         loaded = true;
       } catch (err) {
-        console.error(`[Amazon] Navigation failed (attempt ${attempt}):`, err.message);
+        console.error(`[Amazon] Navigation failed (attempt ${attempt}):`, err instanceof Error ? err.message : err);
         if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * attempt));
       }
     }

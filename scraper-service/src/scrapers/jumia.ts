@@ -69,7 +69,8 @@ export async function scrapeJumia(
 
     return items.map(item => {
       const linkEl = item.querySelector('a.core, a.link');
-      const url = linkEl ? (linkEl.getAttribute('href').startsWith('http') ? linkEl.getAttribute('href') : 'https://www.jumia.com.eg' + linkEl.getAttribute('href')) : '';
+      const hrefAttr = linkEl?.getAttribute('href') || '';
+      const url = linkEl ? (hrefAttr.startsWith('http') ? hrefAttr : 'https://www.jumia.com.eg' + hrefAttr) : '';
 
       const name = item.querySelector('h3.name, div.name')?.textContent?.trim() || 'Unknown';
 

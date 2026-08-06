@@ -1,4 +1,8 @@
-import puppeteer, { Page } from 'puppeteer';
+import stealthPuppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { Page } from 'puppeteer';
+
+stealthPuppeteer.use(StealthPlugin());
 import { Product } from '../types';
 import { scrapeAmazon } from './amazon';
 import { scrapeJumia } from './jumia';
@@ -33,8 +37,8 @@ async function applyStealth(page: Page) {
   // serializes callback source and runs it in the page, where that helper is undefined,
   // so define a no-op polyfill on every new document to keep it present.
   await page.evaluateOnNewDocument(() => {
-    (globalThis as any).__name =
-      globalThis.__name || ((f: any, _name: string) => f);
+    (globalThis as unknown as Record<string, unknown>).__name =
+      (globalThis as any).__name || ((f: any, _name: string) => f);
   });
 
   await page.evaluateOnNewDocument(() => {
@@ -99,7 +103,7 @@ async function runOne(
 
 /** Run scrapers with aggressive concurrency and early exit on timeout. */
 export async function runAllScrapers(query: string): Promise<Product[]> {
-  const browser = await puppeteer.launch({
+  const browser = await stealthPuppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     timeout: 60_000,
