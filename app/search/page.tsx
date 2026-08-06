@@ -293,7 +293,7 @@ function SearchPageInner() {
 
         {/* Results grid */}
         {!loading && products.length > 0 && visibleProducts.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {visibleProducts.map((p, i) => (
               <ProductCard
                 key={`${p.url}-${i}`}

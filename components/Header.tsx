@@ -161,14 +161,14 @@ function Header() {
           )}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 items-center h-16 gap-4">
-              {/* Logo (left) */}
-              <div className="flex items-center justify-start">
+            <div className="flex items-center justify-between h-16 gap-2 sm:gap-4">
+              {/* Logo (left in standard flex, right in RTL) */}
+              <div className="flex items-center shrink-0">
                 <Logo />
               </div>
 
-              {/* Center nav (desktop) */}
-              <nav className="hidden md:flex items-center justify-center">
+              {/* Center nav (desktop - lg and up) */}
+              <nav className="hidden lg:flex items-center justify-center shrink-0">
                 <ul className="flex items-center gap-1 p-1 rounded-full bg-bg-card border border-[var(--paper-border-soft)]">
                   {NAV_LINKS.map((link) => {
                     const active = isActive(link.href);
@@ -177,7 +177,7 @@ function Header() {
                         <Link
                           href={link.href}
                           className={cn(
-                            'relative px-4 py-2 text-sm font-medium rounded-full transition-colors duration-200',
+                            'relative px-3.5 py-1.5 text-sm font-medium rounded-full transition-colors duration-200 whitespace-nowrap block',
                             active
                               ? 'text-deal'
                               : 'text-secondary hover:text-primary'
@@ -194,8 +194,8 @@ function Header() {
                 </ul>
               </nav>
 
-              {/* Actions (right) */}
-              <div className="flex items-center justify-end gap-2">
+              {/* Actions (right in standard flex, left in RTL) */}
+              <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -203,32 +203,35 @@ function Header() {
                     requestAnimationFrame(() => inputRef.current?.focus());
                   }}
                   aria-label="بحث سريع"
-                  className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-primary hover:border-deal/50 transition-colors text-sm"
+                  className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-primary hover:border-deal/50 transition-colors text-sm whitespace-nowrap shrink-0"
                 >
-                  <Search size={15} />
-                  <span className="hidden lg:inline">ابحث عن منتج</span>
-                  <kbd className="hidden lg:inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)] text-muted">
+                  <Search size={15} className="shrink-0" />
+                  <span className="hidden xl:inline">ابحث عن منتج</span>
+                  <kbd className="hidden xl:inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)] text-muted">
                     ⌘K
                   </kbd>
                 </button>
 
                 <Link
                   href="/search"
-                  className="hidden md:inline-flex btn btn-primary h-9 px-4 text-sm items-center"
+                  className="hidden xl:inline-flex btn btn-primary h-9 px-3.5 text-sm items-center gap-1.5 whitespace-nowrap shrink-0"
                 >
-                  <Sparkles size={15} />
-                  ابدأ المقارنة
+                  <Sparkles size={15} className="shrink-0" />
+                  <span>ابدأ المقارنة</span>
                 </Link>
 
                 {isAuthed ? (
-                  <UserMenu />
+                  <div className="shrink-0">
+                    <UserMenu />
+                  </div>
                 ) : (
                   <Link
                     href="/login"
                     aria-label="تسجيل الدخول"
-                    className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-deal hover:border-deal/50 transition-colors"
+                    className="inline-flex items-center justify-center h-9 px-3 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-secondary hover:text-deal hover:border-deal/50 transition-colors text-sm font-medium whitespace-nowrap gap-1.5 shrink-0"
                   >
-                    <LogIn size={16} />
+                    <LogIn size={16} className="shrink-0" />
+                    <span className="hidden sm:inline">دخول</span>
                   </Link>
                 )}
 
@@ -237,7 +240,7 @@ function Header() {
                   aria-label={mobileOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
                   aria-expanded={mobileOpen}
                   onClick={() => setMobileOpen((v) => !v)}
-                  className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-primary hover:border-deal/40 transition-colors"
+                  className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-primary hover:border-deal/40 transition-colors shrink-0"
                 >
                   {mobileOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
@@ -249,11 +252,11 @@ function Header() {
         {/* Mobile menu */}
         <div
           className={cn(
-            'md:hidden overflow-hidden transition-[max-height,opacity] duration-300 ease-out',
+            'lg:hidden overflow-hidden transition-[max-height,opacity] duration-300 ease-out',
             mobileOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
           )}
         >
-          <div className="bg-bg-primary/95 backdrop-blur-xl border-b border-[var(--paper-border-soft)] px-4 py-4">
+          <div className="bg-bg-primary/95 backdrop-blur-xl border-b border-[var(--paper-border-soft)] px-4 py-4 shadow-lg">
             <ul className="flex flex-col gap-1">
               {NAV_LINKS.map((link) => {
                 const active = isActive(link.href);
@@ -263,7 +266,7 @@ function Header() {
                       href={link.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        'flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                        'flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors whitespace-nowrap',
                         active
                           ? 'bg-deal/10 text-deal border border-deal/30'
                           : 'text-secondary hover:text-primary hover:bg-bg-card border border-transparent'
@@ -271,7 +274,7 @@ function Header() {
                     >
                       <span>{link.label}</span>
                       {active && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-deal" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-deal shrink-0" />
                       )}
                     </Link>
                   </li>
@@ -286,17 +289,27 @@ function Header() {
                   setSearchOpen(true);
                   requestAnimationFrame(() => inputRef.current?.focus());
                 }}
-                className="btn btn-outline flex-1 justify-center text-sm"
+                className="btn btn-outline flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
               >
                 <Search size={15} /> بحث
               </button>
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="btn btn-primary flex-1 justify-center text-sm"
-              >
-                <LogIn size={15} /> دخول
-              </Link>
+              {!isAuthed ? (
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="btn btn-primary flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
+                >
+                  <LogIn size={15} /> دخول
+                </Link>
+              ) : (
+                <Link
+                  href="/search"
+                  onClick={() => setMobileOpen(false)}
+                  className="btn btn-primary flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
+                >
+                  <Sparkles size={15} /> ابدأ المقارنة
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -307,25 +320,29 @@ function Header() {
 
       {showVerifyBanner && (
         <div className="bg-deal/10 border-b border-deal/25 text-deal">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-3 text-sm">
-            <MailCheck size={16} className="shrink-0" />
-            <span className="flex-1">
-              أكّد بريدك الإلكتروني عشان تقدر تحفظ نتائج البحث.
-            </span>
-            <Link
-              href="/login"
-              className="text-deal hover:text-deal/80 underline underline-offset-2"
-            >
-              أعد إرسال الرسالة
-            </Link>
-            <button
-              type="button"
-              aria-label="إغلاق"
-              onClick={() => setBannerDismissed(true)}
-              className="text-deal/80 hover:text-deal"
-            >
-              <X size={14} />
-            </button>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-3 text-xs sm:text-sm">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <MailCheck size={16} className="shrink-0" />
+              <span className="truncate sm:whitespace-normal">
+                أكّد بريدك الإلكتروني عشان تقدر تحفظ نتائج البحث.
+              </span>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <Link
+                href="/login"
+                className="text-deal hover:text-deal/80 underline underline-offset-2 whitespace-nowrap font-medium"
+              >
+                أعد إرسال الرسالة
+              </Link>
+              <button
+                type="button"
+                aria-label="إغلاق"
+                onClick={() => setBannerDismissed(true)}
+                className="text-deal/80 hover:text-deal p-1"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -357,7 +374,7 @@ function Header() {
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onSearchKey}
                 placeholder="ابحث عن منتج (مثل جالكسي اس 24)"
-                className="w-full bg-transparent text-lg text-primary placeholder:text-muted py-5 focus:outline-none"
+                className="w-full bg-transparent text-lg text-primary placeholder:text-muted py-5 pr-12 pl-12 focus:outline-none"
                 aria-label="بحث"
               />
               <button
@@ -376,7 +393,7 @@ function Header() {
             </form>
 
             <div className="border-t border-[var(--paper-border-soft)] px-4 py-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted flex items-center gap-1">
+              <span className="text-xs text-muted flex items-center gap-1 whitespace-nowrap">
                 <Sparkles size={12} /> اقتراحات
               </span>
               {SUGGESTED_QUERIES.map((s) => (
@@ -389,7 +406,7 @@ function Header() {
                     setSearchOpen(false);
                     setQuery('');
                   }}
-                  className="pill text-xs"
+                  className="pill text-xs whitespace-nowrap"
                 >
                   {s}
                 </button>
@@ -398,20 +415,20 @@ function Header() {
 
             <div className="px-4 py-2 border-t border-[var(--paper-border-soft)] flex items-center justify-between text-[11px] text-muted">
               <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)]">
                     ↵
                   </kbd>
                   للبحث
                 </span>
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <kbd className="font-mono px-1 py-0.5 rounded bg-bg-secondary/80 border border-[var(--paper-border-soft)]">
                     Esc
                   </kbd>
                   للإغلاق
                 </span>
               </div>
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 <ChevronDown size={12} /> قارنها
               </span>
             </div>
@@ -428,10 +445,10 @@ export function Logo() {
   return (
     <Link
       href="/"
-      className="group inline-flex items-center gap-2.5 shrink-0"
+      className="group inline-flex items-center gap-2.5 shrink-0 whitespace-nowrap"
       aria-label="قارنها — الصفحة الرئيسية"
     >
-      <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-bg-card border border-[var(--paper-border)] shadow-[var(--shadow-sm)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
+      <span className="relative inline-flex items-center justify-center w-9 h-9 rounded-xl bg-bg-card border border-[var(--paper-border)] shadow-[var(--shadow-sm)] transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3 shrink-0">
         <span className="absolute inset-0 rounded-xl ring-1 ring-deal/25 ring-offset-0" />
         <Image
           src="/explore-svgrepo-com.svg"
@@ -442,10 +459,10 @@ export function Logo() {
         />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="text-lg font-extrabold tracking-tight text-primary">
+        <span className="text-base sm:text-lg font-extrabold tracking-tight text-primary whitespace-nowrap">
           قارن<span className="text-deal">ها</span>
         </span>
-        <span className="text-[10px] text-muted mt-0.5 hidden sm:block">
+        <span className="text-[10px] text-muted mt-0.5 hidden xl:block whitespace-nowrap">
           قارن أسعارك في ثوانٍ
         </span>
       </span>
