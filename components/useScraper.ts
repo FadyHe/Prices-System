@@ -145,7 +145,11 @@ export function useScraper(initialQuery: string = '') {
     try {
       const jobId = await submitJob(query, controller.signal);
       if (requestId !== requestIdRef.current) return;
-      const result = await pollJob(jobId, controller.signal, 180_000);
+      // GH Actions job runs have a 7-minute timeout-minutes and include cold
+// start, checkout, npm ci, Chrome install, plus up to 3 concurrent scrapers
+// each capped at 30s. 8.5 min covers the worst case; a truly dead job is
+// auto-failed server-side after 8 min so we don't sit on a ghost.
+const result = await pollJob(jobId, controller.signal, 510_000);
       if (requestId !== requestIdRef.current) return;
 
       if (result.status === 'failed') {
