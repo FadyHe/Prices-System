@@ -35,7 +35,7 @@ async function isCaptchaPage(page: Page): Promise<boolean> {
 }
 
 /** Small random delay to appear more human */
-function randomDelay(min = 2000, max = 4000): Promise<void> {
+function randomDelay(min = 500, max = 1000): Promise<void> {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -47,7 +47,8 @@ export async function scrapeAmazon(
 ): Promise<Product[]> {
 
   const allProducts: Product[] = [];
-  const maxPages = 3;
+  const ADAPTIVE_PAGE2_THRESHOLD = 8;
+  let maxPages = 1;
 
   for (let currentPage = 1; currentPage <= maxPages; currentPage++) {
     if (allProducts.length >= maxProducts) break;
@@ -58,7 +59,7 @@ export async function scrapeAmazon(
     console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
 
     try {
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
       console.log(`[Amazon] Page ${currentPage} loaded`);
     } catch (err) {
       console.error('[Amazon] Navigation failed:', err);
@@ -203,9 +204,14 @@ export async function scrapeAmazon(
 
     allProducts.push(...(products as unknown as Product[]));
 
+    // Adaptive: if page 1 returned thin, fetch page 2 to fill up to maxProducts.
+    if (currentPage === 1 && allProducts.length < Math.min(ADAPTIVE_PAGE2_THRESHOLD, maxProducts)) {
+      maxPages = 2;
+    }
+
     // Random delay between pages to reduce detection
     if (currentPage < maxPages && allProducts.length < maxProducts) {
-      await randomDelay(2000, 4000);
+      await randomDelay(500, 1000);
     }
   }
 

@@ -64,7 +64,7 @@ export async function scrapeNoon(
   console.log('[Noon] Navigating to:', url);
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 90000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     console.log('[Noon] Page loaded');
   } catch (err) {
     console.error('[Noon] Navigation failed:', err);

@@ -18,6 +18,13 @@ export async function scrapeJumia(
     throw err;
   }
 
+  // Wait for product cards before extracting (products load after domcontentloaded).
+  try {
+    await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
+  } catch (err) {
+    console.warn('[Jumia] Product cards not found, extracting whatever is on page');
+  }
+
   const products = await page.evaluate((max) => {
     function convertArabicToWestern(str: string): string {
       const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];

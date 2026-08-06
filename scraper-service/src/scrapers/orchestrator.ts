@@ -65,14 +65,25 @@ async function runOne(
   browser: import('puppeteer').Browser,
   query: string,
   max: number
-): Promise<Product[]> {
+): Promise<{ products: Product[]; elapsedMs: number; timedOut: boolean }> {
   const page = await browser.newPage();
+  const start = Date.now();
+  let timedOut = false;
   try {
     await applyStealth(page);
-    return await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
-  } catch (err) {
-    console.error(`[scrape] ${name} failed`, err);
-    return [];
+    try {
+      const products = await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
+      return { products, elapsedMs: Date.now() - start, timedOut: false };
+    } catch (err) {
+      // withTimeout rejects -> the site hit its 30s cap.
+      if (err instanceof Error && err.message.includes('timed out after')) {
+        timedOut = true;
+        console.error(`[scrape] ${name} hit its ${PER_SITE_TIMEOUT_MS}ms timeout`);
+      } else {
+        console.error(`[scrape] ${name} failed`, err);
+      }
+      return { products: [], elapsedMs: Date.now() - start, timedOut };
+    }
   } finally {
     await page.close().catch(() => undefined);
   }
@@ -87,12 +98,19 @@ export async function runAllScrapers(query: string): Promise<Product[]> {
   });
 
   try {
+    const totalStart = Date.now();
     const results = await Promise.all([
       runOne('Amazon', scrapeAmazon, browser, query, MAX_PER_SITE),
       runOne('Jumia', scrapeJumia, browser, query, MAX_PER_SITE),
       runOne('Noon', scrapeNoon, browser, query, MAX_PER_SITE),
     ]);
-    return results.flat();
+    for (const r of results) {
+      console.log(
+        `[timing] ${r.timedOut ? 'TIMEOUT' : 'ok    '} elapsed=${r.elapsedMs}ms`
+      );
+    }
+    console.log(`[timing] allScrapers total=${Date.now() - totalStart}ms`);
+    return results.flatMap((r) => r.products);
   } finally {
     await browser.close();
   }

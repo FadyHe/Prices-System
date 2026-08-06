@@ -52,10 +52,6 @@ jobs:
         working-directory: scraper-service
         run: npm ci || npm install
 
-      - name: Build scraper-service
-        working-directory: scraper-service
-        run: npm run build
-
       - name: Install Puppeteer Chrome (skipping Chromium download)
         working-directory: scraper-service
         env:
@@ -77,29 +73,7 @@ jobs:
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
         run: |
           set -e
-          node -e "
-            const { runAllScrapers } = require('./dist/scrapers/orchestrator');
-            const { normalizeProductName } = require('./dist/search/normalize');
-            const { scoreProduct } = require('./dist/search/score');
-            (async () => {
-              const query = process.env.QUERY;
-              const raw = await runAllScrapers(query);
-              const { tokens: queryTokens } = normalizeProductName(query);
-              const MIN_RELEVANCE = 0.3;
-              const filtered = raw
-                .map(p => {
-                  const { tokens: pTokens } = normalizeProductName(p.name);
-                  const score = scoreProduct(pTokens, queryTokens);
-                  const relevance = queryTokens.length > 0 ? score / queryTokens.length : 0;
-                  return { ...p, score, relevance };
-                })
-                .filter(p => p.score > 0 && p.relevance >= MIN_RELEVANCE)
-                .sort((a, b) => a.price - b.price);
-              const out = { jobId: process.env.JOB_ID, totalScraped: raw.length, count: filtered.length, products: filtered };
-              require('fs').writeFileSync('result.json', JSON.stringify(out));
-              console.log('scraped=' + raw.length + ' kept=' + filtered.length);
-            })().catch(err => { console.error(err); process.exit(1); });
-          "
+          npx tsx src/scrape-runner.ts
 
       - name: Post results to webhook
         if: always()
@@ -108,14 +82,14 @@ jobs:
           WEBHOOK_SECRET: ${{ env.WEBHOOK_SECRET }}
           JOB_ID: ${{ env.JOB_ID }}
         run: |
-          set +e
+          set -e
           if [ -f scraper-service/result.json ]; then
             BODY=$(cat scraper-service/result.json)
           else
             BODY="{\"jobId\":\"$JOB_ID\",\"error\":\"scraper_failed\"}"
           fi
-          curl -sS -X POST "$WEBHOOK_URL" \
+          curl -fsS -o /dev/null -w "webhook_http=%{http_code}\n" \
+            -X POST "$WEBHOOK_URL" \
             -H "Authorization: Bearer $WEBHOOK_SECRET" \
             -H "Content-Type: application/json" \
             -d "$BODY"
-          echo

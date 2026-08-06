@@ -11,14 +11,21 @@ export async function scrapeJumia(
   console.log('[Jumia] Navigating to:', url);
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     console.log('[Jumia] Page loaded');
   } catch (err) {
     console.error('[Jumia] Navigation failed:', err);
     throw err;
   }
 
-  await new Promise(r => setTimeout(r, 3000));
+  await new Promise(r => setTimeout(r, 1000));
+
+  // Wait for product cards before extracting (products load after domcontentloaded).
+  try {
+    await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
+  } catch (err) {
+    console.warn('[Jumia] Product cards not found, extracting whatever is on page');
+  }
 
   const products: Product[] = [];
 
@@ -115,7 +122,7 @@ export async function scrapeJumia(
       page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {})
     ]);
 
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 1000));
   }
 
   console.log(`[Jumia] Extracted ${products.length} products`);
