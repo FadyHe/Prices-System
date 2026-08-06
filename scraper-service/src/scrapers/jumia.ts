@@ -6,41 +6,75 @@ export async function scrapeJumia(
   query: string,
   maxProducts = 15
 ): Promise<Product[]> {
-
   const url = `https://www.jumia.com.eg/ar/catalog/?q=${encodeURIComponent(query)}`;
   console.log('[Jumia] Navigating to:', url);
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     console.log('[Jumia] Page loaded');
   } catch (err) {
     console.error('[Jumia] Navigation failed:', err);
     throw err;
   }
 
-  // Wait for product cards. Jumia sometimes serves a bot-check interstitial ("لحظة")
-  // that auto-solves after a few seconds; retry with a wait between attempts.
-  let jumiaCardsFound = false;
-  for (let attempt = 1; attempt <= 4 && !jumiaCardsFound; attempt++) {
-    try {
-      await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
-      jumiaCardsFound = true;
-    } catch (err) {
-      const dbg = await page.evaluate(() => ({
-        title: document.title,
-        url: location.href,
-        articleCnt: document.querySelectorAll('article.prd, article.-paxs').length,
-      }));
-      console.warn(`[Jumia] Product cards not found (attempt ${attempt}). title=${dbg.title} articles=${dbg.articleCnt} url=${dbg.url}`);
-      if (attempt < 4) await new Promise((r) => setTimeout(r, 5000));
+  // Jumia embeds search results as JSON in the page's `window.__STORE__` script
+  // (name/price/image/url). Reading that sidesteps the "لحظة" (one moment)
+  // bot-check interstitial that renders a blank grid for datacenter IPs and
+  // avoids waiting for client-side DOM hydration.
+  const storeProducts = await page.evaluate(() => {
+    const scripts = Array.from(document.querySelectorAll('script'));
+    let store: { products?: Array<Record<string, unknown>> } | null = null;
+    for (const s of scripts) {
+      const t = s.textContent || '';
+      const i = t.indexOf('window.__STORE__=');
+      if (i !== -1) {
+        try {
+          store = JSON.parse(t.slice(i + 'window.__STORE__='.length).replace(/;\s*$/, ''));
+          break;
+        } catch {
+          store = null;
+        }
+      }
     }
+    if (!store || !Array.isArray(store.products)) return null;
+
+    return store.products.map((p: any) => {
+      const name = p.displayName || p.name || '';
+      const priceText = p.prices?.rawPrice ?? p.prices?.price ?? '';
+      const price = parseFloat(String(priceText).replace(/[^\d.]/g, ''));
+      const href = p.url || '';
+      const image = p.image || '';
+      return { name, price, href, image };
+    }).filter((p: any) => p.name && p.price > 0);
+  });
+
+  if (storeProducts && storeProducts.length > 0) {
+    const products: Product[] = storeProducts.slice(0, maxProducts).map((p: any) => ({
+      name: p.name,
+      price: p.price,
+      currency: 'EGP',
+      seller: 'Jumia',
+      url: p.href.startsWith('http') ? p.href : 'https://www.jumia.com.eg' + p.href,
+      image: p.image,
+      source: 'Jumia.eg'
+    }));
+    console.log(`[Jumia] Extracted ${products.length} products (from __STORE__)`);
+    return products;
+  }
+
+  // Fallback: wait for client-rendered product cards, then scrape the DOM.
+  try {
+    await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
+  } catch {
+    const title = await page.title();
+    console.warn(`[Jumia] No product cards after wait. title="${title}". Returning empty.`);
+    return [];
   }
 
   const products = await page.evaluate((max) => {
     function convertArabicToWestern(str: string): string {
       const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
       const westernNumerals = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
       let result = str;
       for (let i = 0; i < arabicNumerals.length; i++) {
         result = result.split(arabicNumerals[i]).join(westernNumerals[i]);
@@ -96,6 +130,6 @@ export async function scrapeJumia(
     }).filter((item): item is Product => item !== null).slice(0, max);
   }, maxProducts);
 
-  console.log(`[Jumia] Extracted ${products.length} products`);
+  console.log(`[Jumia] Extracted ${products.length} products (from DOM)`);
   return products;
 }
