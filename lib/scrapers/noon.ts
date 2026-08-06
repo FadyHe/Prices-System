@@ -1,4 +1,4 @@
-import { Page } from 'puppeteer';
+import { Page } from 'puppeteer-core';
 import { Product } from '@/lib/types';
 
 const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;

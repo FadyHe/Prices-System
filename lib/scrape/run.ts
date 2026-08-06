@@ -1,4 +1,4 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import { Browser, Page } from 'puppeteer-core';
 import { Product } from '@/lib/types';
 import {
   scrapeAmazon,
@@ -165,21 +165,48 @@ async function runOne(
  * shared lib/search module. This does NOT depend on GitHub Actions, so it
  * works on localhost and production alike even when GH runners are down.
  */
+/** Detect the serverless environment (Vercel) where no Chrome is on disk. */
+function isServerless(): boolean {
+  // Vercel sets AWS_LAMBDA_FUNCTION_NAME / VERCEL on functions.
+  return !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+}
+
+const COMMON_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-blink-features=AutomationControlled',
+  '--window-size=1280,900',
+  // Noon rejects HTTP/2 with ERR_HTTP2_PROTOCOL_ERROR; force HTTP/1.1.
+  '--disable-http2',
+];
+
+async function launchBrowser(): Promise<Browser> {
+  if (isServerless()) {
+    const mod = await import('@sparticuz/chromium');
+    const chromium = mod.default || mod;
+    const puppeteerCore = await import('puppeteer-core');
+    return puppeteerCore.launch({
+      executablePath: await chromium.executablePath(),
+      headless: true,
+      args: (chromium.args || []).concat(COMMON_ARGS),
+      timeout: 30_000,
+    });
+  }
+  // Local dev: use the app's plain puppeteer (it bundles a Chrome). Its
+  // Browser is structurally compatible with puppeteer-core's; the cast
+  // reconciles the two distinct class types.
+  const puppeteer = await import('puppeteer');
+  return puppeteer.launch({
+    headless: true,
+    args: COMMON_ARGS,
+    timeout: 30_000,
+  }) as unknown as Promise<Browser>;
+}
+
 export async function runAllScrapers(query: string): Promise<ScrapeResult> {
   const start = Date.now();
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled',
-      '--window-size=1280,900',
-      // Noon rejects HTTP/2 with ERR_HTTP2_PROTOCOL_ERROR; force HTTP/1.1.
-      '--disable-http2',
-    ],
-    timeout: 30_000,
-  });
+  const browser = await launchBrowser();
   try {
     const results = await Promise.all([
       runOne('Amazon', scrapeAmazon, browser, query, MAX_PER_SITE, {

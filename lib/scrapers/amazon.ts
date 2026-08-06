@@ -1,4 +1,4 @@
-import { Page } from 'puppeteer';
+import { Page } from 'puppeteer-core';
 import { Product } from '@/lib/types';
 import path from 'path';
 
