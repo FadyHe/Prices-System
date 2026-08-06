@@ -14,17 +14,27 @@ export async function scrapeJumia(
   query: string,
   maxProducts = 15
 ): Promise<Product[]> {
-  const fromFetch = await scrapeViaFetch(query, maxProducts);
-  if (fromFetch.length > 0) {
-    console.log(`[Jumia] Extracted ${fromFetch.length} products (via fetch)`);
-    return fromFetch;
+  const { products, status } = await scrapeViaFetch(query, maxProducts);
+  if (products.length > 0) {
+    console.log(`[Jumia] Extracted ${products.length} products (via fetch)`);
+    return products;
+  }
+
+  // 403 from a datacenter IP means Jumia's edge blocks this caller; the
+  // browser fallback hits the same "لحظة" interstitial and only wastes time.
+  if (status === 403) {
+    console.warn('[Jumia] fetch 403 (IP blocked) — skipping browser DOM fallback');
+    return [];
   }
 
   console.log('[Jumia] fetch returned nothing, falling back to browser DOM');
   return scrapeViaPuppeteer(page, query, maxProducts);
 }
 
-async function scrapeViaFetch(query: string, maxProducts: number): Promise<Product[]> {
+async function scrapeViaFetch(
+  query: string,
+  maxProducts: number
+): Promise<{ products: Product[]; status: number }> {
   const url = `https://www.jumia.com.eg/ar/catalog/?q=${encodeURIComponent(query)}`;
   try {
     const res = await fetch(url, {
@@ -37,24 +47,24 @@ async function scrapeViaFetch(query: string, maxProducts: number): Promise<Produ
     });
     if (!res.ok) {
       console.warn(`[Jumia] fetch HTTP ${res.status}`);
-      return [];
+      return { products: [], status: res.status };
     }
     const html = await res.text();
     const marker = 'window.__STORE__=';
     const i = html.indexOf(marker);
     if (i === -1) {
       console.warn(`[Jumia] No __STORE__ in response (len=${html.length})`);
-      return [];
+      return { products: [], status: res.status };
     }
     const m = html.slice(i + marker.length).match(/\}\s*;\s*<\/script>/);
     if (!m || m.index === undefined) {
       console.warn('[Jumia] Could not find end of __STORE__ JSON');
-      return [];
+      return { products: [], status: res.status };
     }
     const store = JSON.parse(html.slice(i + marker.length, i + marker.length + m.index + 1));
-    if (!Array.isArray(store?.products)) return [];
+    if (!Array.isArray(store?.products)) return { products: [], status: res.status };
 
-    return store.products
+    const products = store.products
       .map((p: any): Product | null => {
         const name = p.displayName || p.name || '';
         const priceText = p.prices?.rawPrice ?? p.prices?.price ?? '';
@@ -73,9 +83,10 @@ async function scrapeViaFetch(query: string, maxProducts: number): Promise<Produ
       })
       .filter((p: Product | null): p is Product => p !== null)
       .slice(0, maxProducts);
+    return { products, status: res.status };
   } catch (err) {
     console.warn('[Jumia] fetch failed:', err instanceof Error ? err.message : err);
-    return [];
+    return { products: [], status: 0 };
   }
 }
 
@@ -92,7 +103,7 @@ async function scrapeViaPuppeteer(page: Page, query: string, maxProducts: number
   }
 
   try {
-    await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
+    await page.waitForSelector('article.prd, article.-paxs', { timeout: 3000 });
   } catch {
     const title = await page.title();
     console.warn(`[Jumia] No product cards after wait. title="${title}". Returning empty.`);
