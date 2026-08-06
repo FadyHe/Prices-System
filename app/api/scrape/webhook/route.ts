@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'crypto';
 import { connectDB } from '@/lib/db/mongodb';
 import { ScrapeJob } from '@/lib/db/models';
 import { audit } from '@/lib/audit';
@@ -46,14 +47,21 @@ function asProductArray(v: unknown): Product[] {
 
 export async function POST(req: Request) {
   const expected = process.env.WEBHOOK_SECRET;
+  // Fail-closed: an unset/empty WEBHOOK_SECRET rejects ALL requests, never
+  // skips verification. Verified in constant time against a SHA-256
+  // pre-hash so timingSafeEqual gets equal-length buffers (doesn't leak
+  // length either).
   if (!expected) {
     return Response.json({ error: 'webhook not configured' }, { status: 503 });
   }
   const auth = req.headers.get('authorization') || '';
   const match = auth.match(/^Bearer\s+(.+)$/i);
-  if (!match || match[1] !== expected) {
-    return Response.json({ error: 'unauthorized' }, { status: 401 });
-  }
+  if (!match) return Response.json({ error: 'unauthorized' }, { status: 401 });
+  const actual = createHash('sha256').update(match[1]).digest();
+  const want = createHash('sha256').update(expected).digest();
+  const ok =
+    actual.length === want.length && timingSafeEqual(actual, want);
+  if (!ok) return Response.json({ error: 'unauthorized' }, { status: 401 });
 
   let body: WebhookBody;
   try {
