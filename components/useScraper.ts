@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { normalizeProductName } from '@/lib/search/normalize';
 import { scoreProduct } from '@/lib/search/score';
+import { MIN_RELEVANCE } from '@/lib/search/min-relevance';
 import { fireSavePrompt } from '@/components/SaveSearchPrompt';
 
 export interface Product {
@@ -84,7 +85,7 @@ async function pollJob(
 function filterByRelevance(
   products: Product[],
   query: string,
-  minRelevance = 0.5
+  minRelevance = MIN_RELEVANCE
 ): Product[] {
   const { tokens: queryTokens } = normalizeProductName(query);
   if (queryTokens.length === 0) return products;

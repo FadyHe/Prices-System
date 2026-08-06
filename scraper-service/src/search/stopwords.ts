@@ -1,3 +1,7 @@
+// High-frequency function words / filler units only. Deliberately does NOT
+// include units like "جرام"/"كيلو"/"مل"/"سم" — those are meaningful tokens
+// in queries like "كابل شاحن 2 متر" / "زيت 1 لتر" and were over-filtering
+// real product terms. No duplicates.
 export const STOPWORDS = [
   "من",
   "في",
@@ -5,33 +9,14 @@ export const STOPWORDS = [
   "مع",
   "الى",
   "إلى",
-  "عبوة",
-  "مجموعة",
+  "ال",
+  "عدد",
   "عرض",
   "خاص",
-  "عدد",
-  "قطعة",
-  "قطع",
-  "-",
-  "،",
-  "ال",
-  "جرام",
-  "كيلو",
-  "كيلوغرام",
-  "غرام",
-  "جم",
-  "،",
-  "",
-  "وزن",
-  "جرام",
-  "جم",
-  "kg",
-  "سم",
-  "قطعة",
   "قطعتين",
   "مجانا",
-  "led",
+  "مجموعة",
+  "عبوة",
   "تعمل",
-  "قابلة",
-  "مل"
+  "قابلة"
 ];

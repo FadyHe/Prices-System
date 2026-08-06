@@ -5,6 +5,7 @@ import { products } from "@/lib/products.js";
 import { useState, useMemo } from "react";
 import { normalizeProductName } from "@/lib/search/normalize";
 import { scoreProduct } from "@/lib/search/score";
+import { MIN_RELEVANCE } from "@/lib/search/min-relevance";
 
 const PLACEHOLDER_IMG =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%231e293b'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Cairo,sans-serif' font-size='14' fill='%2364748b'>لا توجد صورة</text></svg>";
@@ -26,9 +27,8 @@ function Page() {
       return { ...p, score, relevance };
     });
 
-    const minRelevance = 0.5;
     const results = scored
-      .filter((p) => p.score > 0 && p.relevance >= minRelevance)
+      .filter((p) => p.score > 0 && p.relevance >= MIN_RELEVANCE)
       .sort((a, b) => b.score - a.score);
 
     return results;
