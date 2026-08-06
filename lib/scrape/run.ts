@@ -37,7 +37,8 @@ async function runOne(
   fn: (page: Page, query: string, max: number) => Promise<Product[]>,
   browser: Browser,
   query: string,
-  max: number
+  max: number,
+  timeoutMs = PER_SITE_TIMEOUT_MS
 ): Promise<{ products: Product[]; failure?: SourceFailure }> {
   const page = await browser.newPage();
   try {
@@ -52,7 +53,7 @@ async function runOne(
     });
     // Light jitter so concurrent sites don't all hit their CDNs at once.
     await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 500) + 150));
-    const products = await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
+    const products = await withTimeout(fn(page, query, max), timeoutMs, name);
     if (products.length === 0) {
       return { products, failure: { site: name, reason: 'empty', detail: 'scraper returned 0 products' } };
     }

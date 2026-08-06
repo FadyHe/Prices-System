@@ -13,10 +13,10 @@ export async function scrapeNoon(
   console.log('[Noon] Navigating to:', url);
 
   try {
-    // 'domcontentloaded' at a short cap: Noon is anti-bot and slow, so a
-    // hang here must not eat the whole site budget. On failure we skip Noon
-    // gracefully instead of failing the whole scrape.
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    // Noon actively blocks headless Chromium: the page never settles to
+    // domcontentloaded, so goto only returns via timeout. Cap it short and
+    // skip gracefully — low-value to hold the whole run for one site.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
     console.log('[Noon] Page loaded');
   } catch (err) {
     console.error('[Noon] Navigation failed:', err);
