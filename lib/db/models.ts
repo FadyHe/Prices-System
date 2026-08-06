@@ -6,7 +6,7 @@ const SavedProductSchema = new Schema(
     price: { type: Number, required: true },
     currency: { type: String, required: true },
     seller: { type: String, required: true },
-    url: { type: String, required: true },
+    url: { type: String, default: '' },
     source: { type: String, required: true },
     image: { type: String, default: '' },
   },

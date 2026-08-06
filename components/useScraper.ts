@@ -27,7 +27,10 @@ interface JobStatus {
 }
 
 /** Submit a search query and get a jobId back. */
-async function submitJob(query: string, signal?: AbortSignal): Promise<string> {
+async function submitJob(
+  query: string,
+  signal?: AbortSignal
+): Promise<{ jobId: string; immediate?: JobStatus }> {
   const res = await fetch('/api/scrape', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,8 +47,14 @@ async function submitJob(query: string, signal?: AbortSignal): Promise<string> {
     }
     throw new Error(msg);
   }
-  const data = (await res.json()) as { jobId: string };
-  return data.jobId;
+  const data = (await res.json()) as JobStatus & { jobId: string };
+  // In-process path returns status:'complete' + products directly in the
+  // POST body — skip polling entirely. Async paths return status:'pending'
+  // and the client polls the status endpoint.
+  if (data.status === 'complete') {
+    return { jobId: data.jobId, immediate: data };
+  }
+  return { jobId: data.jobId };
 }
 
 /** Poll the status endpoint until the job is no longer pending/running. */
@@ -143,13 +152,14 @@ export function useScraper(initialQuery: string = '') {
     setHasSearched(true);
 
     try {
-      const jobId = await submitJob(query, controller.signal);
+      const { jobId, immediate } = await submitJob(query, controller.signal);
       if (requestId !== requestIdRef.current) return;
-      // GH Actions job runs have a 7-minute timeout-minutes and include cold
-// start, checkout, npm ci, Chrome install, plus up to 3 concurrent scrapers
-// each capped at 30s. 8.5 min covers the worst case; a truly dead job is
-// auto-failed server-side after 8 min so we don't sit on a ghost.
-const result = await pollJob(jobId, controller.signal, 510_000);
+
+      // In-process path returns complete + products right in the POST body.
+      // Only async (GH Actions) path needs polling.
+      const result =
+        immediate ??
+        (await pollJob(jobId, controller.signal, 510_000));
       if (requestId !== requestIdRef.current) return;
 
       if (result.status === 'failed') {
