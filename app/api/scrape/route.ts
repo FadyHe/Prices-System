@@ -95,6 +95,28 @@ export async function POST(req: Request) {
   const jobId = newJobId();
   cacheSet(`query:${cacheKey}`, jobId, 60_000);
 
+  // Persist the job BEFORE dispatch so (a) a client polling
+  // /scrape/status/[jobId] right after this never 404s, and (b) the
+  // dispatch-failure path below has a real doc to update. A DB failure
+  // must surface as an error, not a 200 referencing a job that doesn't exist.
+  try {
+    await connectDB();
+    await ScrapeJob.create({
+      jobId,
+      query,
+      status: 'pending',
+      userId,
+      ip,
+      plan,
+    });
+  } catch (err) {
+    console.error('[scrape] persist failed', err);
+    return Response.json(
+      { error: 'failed to create scrape job' },
+      { status: 500 }
+    );
+  }
+
   try {
     await triggerWorkflowDispatch({
       repo,
@@ -119,19 +141,6 @@ export async function POST(req: Request) {
       { status: 502 }
     );
   }
-
-  connectDB()
-    .then(() =>
-      ScrapeJob.create({
-        jobId,
-        query,
-        status: 'pending',
-        userId,
-        ip,
-        plan,
-      })
-    )
-    .catch((err) => console.error('[scrape] persist failed', err));
 
   audit({
     userId,

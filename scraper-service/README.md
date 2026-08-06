@@ -101,6 +101,21 @@ For local dev, copy `.env.local.example` to `.env.local` and fill these in.
    fail (404) on repos you can't see, and a leaked token can be revoked from
    the same settings page.
 
+   **Rotation cadence:** a classic `repo`-scope PAT grants access to *every*
+   repo the account can reach, so regenerate it on a **90-day cadence**
+   (or sooner). When regenerating: create a new token with a fresh 90-day
+   expiry, swap it into Vercel/`.env.local`, verify one real dispatch run
+   succeeds, then **revoke the old token immediately**. The 90-day expiry
+   makes a forgotten rotation fail loudly rather than silently.
+
+   **Deferred upgrade (highest-leverage hardening):** replace this classic
+   PAT with a **GitHub App installation token** scoped to just this repo.
+   A classic token is effectively a super-user credential for the account;
+   a GitHub App token can be restricted to a single repository and one
+   permission. Not done in this pass because it requires creating a GitHub
+   App, generating a private key, and swapping the workflow's token source
+   — tracked as a follow-up, not silently skipped.
+
 4. **Vercel env vars** (project → Settings → Environment Variables):
    - `GITHUB_TOKEN` = the classic PAT from step 3.
    - `GITHUB_REPO`  = `your-username/your-repo`.
