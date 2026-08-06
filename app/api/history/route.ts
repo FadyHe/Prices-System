@@ -74,7 +74,12 @@ export async function POST(req: Request) {
     resultCount: body.resultCount ?? 0,
     bestPrice: body.bestPrice,
     bestSource: body.bestSource,
-    savedProducts: body.savedProducts ?? [],
+    // Drop any saved product that lacks a name/price/url — a partial card
+    // with no url is a dead link and shouldn't be persisted (also guards
+    // against schema-level url:required on older/edge stores).
+    savedProducts: (body.savedProducts ?? []).filter(
+      (p) => p && p.name && p.url
+    ),
     pinned: body.pinned ?? false,
   });
   return NextResponse.json({ entry: toHistoryResponse(doc) }, { status: 201 });
