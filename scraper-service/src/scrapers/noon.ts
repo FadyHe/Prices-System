@@ -1,6 +1,8 @@
 import { Page } from 'puppeteer';
 import { Product } from '../types';
 
+const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
+
 export async function scrapeNoon(
   page: Page,
   query: string,
@@ -44,10 +46,13 @@ export async function scrapeNoon(
   await page.evaluate(() => window.scrollBy(0, window.innerHeight));
   await new Promise(r => setTimeout(r, 500));
 
-  const products = await page.evaluate((max) => {
+  const products = await page.evaluate((max, debug) => {
     const results: Record<string, unknown>[] = [];
 
     const items = Array.from(document.querySelectorAll('[data-qa="plp-product-box"]'));
+    let noName = 0;
+    let noPrice = 0;
+    let noUrl = 0;
 
     console.log(`[Noon] Processing ${items.length} product containers (max: ${max})`);
 
@@ -90,14 +95,25 @@ export async function scrapeNoon(
             image,
             source: 'noon.com'
           });
+        } else {
+          if (!name) noName++;
+          if (price <= 0) noPrice++;
+          if (!url) noUrl++;
         }
       } catch (err) {
         console.error('[Noon] Error parsing item:', err);
+        noName++;
       }
     }
 
+    if (debug) {
+      console.log(
+        `[Noon:debug] rawCards=${items.length} kept=${results.length} noName=${noName} noPrice=${noPrice} noUrl=${noUrl}`
+      );
+    }
+
     return results;
-  }, maxProducts);
+  }, maxProducts, DEBUG_SCRAPE);
 
   console.log(`[Noon] Successfully extracted ${products.length} products`);
   return products as unknown as Product[];

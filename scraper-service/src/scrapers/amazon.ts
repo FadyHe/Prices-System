@@ -2,6 +2,8 @@ import { Page } from 'puppeteer';
 import { Product } from '../types';
 import path from 'path';
 
+const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
+
 async function autoScroll(page: Page) {
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
@@ -121,7 +123,7 @@ const allProducts: Product[] = [];
 await autoScroll(page);
      await new Promise(r => setTimeout(r, 500));
 
-    const products = await page.evaluate((max) => {
+    const products = await page.evaluate((max, debug) => {
       function convertArabicToWestern(str: string): string {
         const a = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
         const w = ['0','1','2','3','4','5','6','7','8','9'];
@@ -149,6 +151,8 @@ await autoScroll(page);
       const items = Array.from(
         document.querySelectorAll('div[data-asin]:not([data-asin=""])')
       );
+      let noName = 0;
+      let noPrice = 0;
 
       for (const item of items) {
         if (results.length >= max) break;
@@ -194,11 +198,20 @@ await autoScroll(page);
             image,
             source: 'Amazon.eg'
           });
+        } else {
+          if (!name) noName++;
+          if (price <= 0) noPrice++;
         }
       }
 
+      if (debug) {
+        console.log(
+          `[Amazon:debug] rawCards=${items.length} kept=${results.length} noName=${noName} noPrice=${noPrice}`
+        );
+      }
+
       return results;
-    }, maxProducts - allProducts.length);
+    }, maxProducts - allProducts.length, DEBUG_SCRAPE);
 
     console.log(`[Amazon] Page ${currentPage} extracted ${products.length}`);
 

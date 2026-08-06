@@ -2,6 +2,8 @@ import { Page } from 'puppeteer';
 import { Product } from '../types';
 import path from 'path';
 
+const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
+
 async function autoScroll(page: Page) {
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
@@ -46,7 +48,10 @@ export async function scrapeAmazon(
   maxProducts = 15
 ): Promise<Product[]> {
 
-  const allProducts: Product[] = [];
+const allProducts: Product[] = [];
+  // Default to a single results page; only fetch page 2 when page 1 came back thin
+  // (fewer than ADAPTIVE_PAGE2_THRESHOLD raw products) so short-tail queries still
+  // have a chance to fill up to MAX_PER_SITE.
   const ADAPTIVE_PAGE2_THRESHOLD = 8;
   let maxPages = 1;
 
@@ -58,7 +63,7 @@ export async function scrapeAmazon(
 
     console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
 
-    // Retry transient navigation failures (ERR_INVALID_RESPONSE is intermittent anti-bot).
+// Retry transient navigation failures (ERR_INVALID_RESPONSE is intermittent anti-bot).
     let loaded = false;
     for (let attempt = 1; attempt <= 3 && !loaded; attempt++) {
       try {
@@ -72,14 +77,11 @@ export async function scrapeAmazon(
     }
     if (!loaded) break;
 
-    // --- CAPTCHA detection ---
     const captcha = await isCaptchaPage(page);
     if (captcha) {
       const title = await page.title();
-      console.warn(`[Amazon] ⚠️ CAPTCHA detected! Page title: "${title}"`);
-      console.warn('[Amazon] Amazon is blocking the scraper. Try running with headless:false and solving the CAPTCHA once.');
+      console.warn(`[Amazon] CAPTCHA detected! Page title: "${title}"`);
 
-      // Save a debug screenshot
       try {
         const ssPath = path.join(process.cwd(), `amazon-captcha-debug-${Date.now()}.png`);
         await page.screenshot({ path: ssPath, fullPage: true });
@@ -89,7 +91,6 @@ export async function scrapeAmazon(
       break;
     }
 
-    // --- Wait for product cards ---
     const selectors = [
       'div[data-component-type="s-search-result"]',
       'div.s-result-item',
@@ -110,7 +111,6 @@ export async function scrapeAmazon(
       const title = await page.title();
       console.warn(`[Amazon] No product selectors found. Page title: "${title}". Stopping.`);
 
-      // Save debug screenshot when no products found
       try {
         const ssPath = path.join(process.cwd(), `amazon-empty-debug-${Date.now()}.png`);
         await page.screenshot({ path: ssPath, fullPage: true });
@@ -120,10 +120,10 @@ export async function scrapeAmazon(
       break;
     }
 
-    await autoScroll(page);
-    await new Promise(r => setTimeout(r, 1500));
+await autoScroll(page);
+     await new Promise(r => setTimeout(r, 500));
 
-    const products = await page.evaluate((max) => {
+    const products = await page.evaluate((max, debug) => {
       function convertArabicToWestern(str: string): string {
         const a = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
         const w = ['0','1','2','3','4','5','6','7','8','9'];
@@ -151,30 +151,28 @@ export async function scrapeAmazon(
       const items = Array.from(
         document.querySelectorAll('div[data-asin]:not([data-asin=""])')
       );
+      let noName = 0;
+      let noPrice = 0;
 
       for (const item of items) {
         if (results.length >= max) break;
 
-        // --- Name (broadened) ---
         const nameEl =
           item.querySelector('h2 a span') ||
           item.querySelector('h2 span') ||
           item.querySelector('.a-text-normal');
 
-        // --- Link (broadened) ---
         const linkEl =
           item.querySelector('h2 a') ||
           item.querySelector('a.a-link-normal[href*="/dp/"]') ||
           item.querySelector('a[href*="/dp/"]');
 
-        // --- Price (broadened) ---
         const priceEl =
           item.querySelector('.a-price span.a-offscreen') ||
           item.querySelector('span.a-price-whole') ||
           item.querySelector('span[data-a-color="price"] .a-offscreen') ||
           item.querySelector('.a-color-price');
 
-        // --- Image ---
         const imgEl =
           item.querySelector('img.s-image') ||
           item.querySelector('img[data-image-latency="s-product-image"]');
@@ -200,11 +198,20 @@ export async function scrapeAmazon(
             image,
             source: 'Amazon.eg'
           });
+        } else {
+          if (!name) noName++;
+          if (price <= 0) noPrice++;
         }
       }
 
+      if (debug) {
+        console.log(
+          `[Amazon:debug] rawCards=${items.length} kept=${results.length} noName=${noName} noPrice=${noPrice}`
+        );
+      }
+
       return results;
-    }, maxProducts - allProducts.length);
+    }, maxProducts - allProducts.length, DEBUG_SCRAPE);
 
     console.log(`[Amazon] Page ${currentPage} extracted ${products.length}`);
 
@@ -215,7 +222,6 @@ export async function scrapeAmazon(
       maxPages = 2;
     }
 
-    // Random delay between pages to reduce detection
     if (currentPage < maxPages && allProducts.length < maxProducts) {
       await randomDelay(500, 1000);
     }

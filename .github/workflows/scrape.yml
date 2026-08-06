@@ -71,6 +71,7 @@ jobs:
         working-directory: scraper-service
         env:
           PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          DEBUG_SCRAPE: "true"
         run: |
           set -e
           npx tsx src/scrape-runner.ts
