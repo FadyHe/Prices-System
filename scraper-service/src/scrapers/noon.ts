@@ -85,13 +85,15 @@ export async function scrapeNoon(
                   imgEl?.getAttribute('src') || '';
         }
 
-        if (price > 0 && name && url) {
+        if (price > 0 && name) {
+          // Keep partial cards: url/image may be missing, the UI only needs
+          // name + price to render a row; discard only if name/price unrecoverable.
           results.push({
             name,
             price,
             currency: 'EGP',
             seller: 'noon',
-            url,
+            url: url || '',
             image,
             source: 'noon.com'
           });
