@@ -392,7 +392,7 @@ function ResultsSkeleton() {
         <Loader2 size={20} className="animate-spin text-purple" />
         <span>جاري البحث في المتاجر...</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="glass rounded-2xl overflow-hidden">
             <div className="skeleton aspect-square w-full" />
