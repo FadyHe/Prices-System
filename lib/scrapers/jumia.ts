@@ -1,11 +1,85 @@
 import { Page } from 'puppeteer';
 import { Product } from '../types';
 
+/**
+ * Jumia serves a "لحظة" (one moment) bot-check interstitial to headless Chrome,
+ * so Puppeteer can never see product cards from a datacenter IP. The same
+ * request over plain fetch() with a desktop UA returns the full server-rendered
+ * catalog, with results embedded as JSON in `window.__STORE__`. So we bypass the
+ * browser entirely for Jumia and parse that JSON. Puppeteer DOM scraping remains
+ * as a fallback for environments where fetch is blocked.
+ */
 export async function scrapeJumia(
   page: Page,
   query: string,
   maxProducts = 15
 ): Promise<Product[]> {
+  const fromFetch = await scrapeViaFetch(query, maxProducts);
+  if (fromFetch.length > 0) {
+    console.log(`[Jumia] Extracted ${fromFetch.length} products (via fetch)`);
+    return fromFetch;
+  }
+
+  console.log('[Jumia] fetch returned nothing, falling back to browser DOM');
+  return scrapeViaPuppeteer(page, query, maxProducts);
+}
+
+async function scrapeViaFetch(query: string, maxProducts: number): Promise<Product[]> {
+  const url = `https://www.jumia.com.eg/ar/catalog/?q=${encodeURIComponent(query)}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        'accept-language': 'ar-EG,ar;q=0.9,en;q=0.8',
+      },
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      console.warn(`[Jumia] fetch HTTP ${res.status}`);
+      return [];
+    }
+    const html = await res.text();
+    const marker = 'window.__STORE__=';
+    const i = html.indexOf(marker);
+    if (i === -1) {
+      console.warn(`[Jumia] No __STORE__ in response (len=${html.length})`);
+      return [];
+    }
+    const m = html.slice(i + marker.length).match(/\}\s*;\s*<\/script>/);
+    if (!m || m.index === undefined) {
+      console.warn('[Jumia] Could not find end of __STORE__ JSON');
+      return [];
+    }
+    const store = JSON.parse(html.slice(i + marker.length, i + marker.length + m.index + 1));
+    if (!Array.isArray(store?.products)) return [];
+
+    return store.products
+      .map((p: any): Product | null => {
+        const name = p.displayName || p.name || '';
+        const priceText = p.prices?.rawPrice ?? p.prices?.price ?? '';
+        const price = parseFloat(String(priceText).replace(/[^\d.]/g, ''));
+        const href = p.url || '';
+        if (!name || !price || price <= 0 || !href) return null;
+        return {
+          name,
+          price,
+          currency: 'EGP',
+          seller: 'Jumia',
+          url: href.startsWith('http') ? href : 'https://www.jumia.com.eg' + href,
+          image: p.image || '',
+          source: 'Jumia.eg',
+        };
+      })
+      .filter((p: Product | null): p is Product => p !== null)
+      .slice(0, maxProducts);
+  } catch (err) {
+    console.warn('[Jumia] fetch failed:', err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+async function scrapeViaPuppeteer(page: Page, query: string, maxProducts: number): Promise<Product[]> {
   const url = `https://www.jumia.com.eg/ar/catalog/?q=${encodeURIComponent(query)}`;
   console.log('[Jumia] Navigating to:', url);
 
@@ -17,52 +91,6 @@ export async function scrapeJumia(
     throw err;
   }
 
-  // Jumia embeds search results as JSON in the page's `window.__STORE__` script
-  // (name/price/image/url). Reading that sidesteps the "لحظة" (one moment)
-  // bot-check interstitial that renders a blank grid for datacenter IPs and
-  // avoids waiting for client-side DOM hydration.
-  const storeProducts = await page.evaluate(() => {
-    const scripts = Array.from(document.querySelectorAll('script'));
-    let store: { products?: Array<Record<string, unknown>> } | null = null;
-    for (const s of scripts) {
-      const t = s.textContent || '';
-      const i = t.indexOf('window.__STORE__=');
-      if (i !== -1) {
-        try {
-          store = JSON.parse(t.slice(i + 'window.__STORE__='.length).replace(/;\s*$/, ''));
-          break;
-        } catch {
-          store = null;
-        }
-      }
-    }
-    if (!store || !Array.isArray(store.products)) return null;
-
-    return store.products.map((p: any) => {
-      const name = p.displayName || p.name || '';
-      const priceText = p.prices?.rawPrice ?? p.prices?.price ?? '';
-      const price = parseFloat(String(priceText).replace(/[^\d.]/g, ''));
-      const href = p.url || '';
-      const image = p.image || '';
-      return { name, price, href, image };
-    }).filter((p: any) => p.name && p.price > 0);
-  });
-
-  if (storeProducts && storeProducts.length > 0) {
-    const products: Product[] = storeProducts.slice(0, maxProducts).map((p: any) => ({
-      name: p.name,
-      price: p.price,
-      currency: 'EGP',
-      seller: 'Jumia',
-      url: p.href.startsWith('http') ? p.href : 'https://www.jumia.com.eg' + p.href,
-      image: p.image,
-      source: 'Jumia.eg'
-    }));
-    console.log(`[Jumia] Extracted ${products.length} products (from __STORE__)`);
-    return products;
-  }
-
-  // Fallback: wait for client-rendered product cards, then scrape the DOM.
   try {
     await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
   } catch {
