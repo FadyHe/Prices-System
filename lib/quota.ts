@@ -45,22 +45,28 @@ async function reserve(
   const window = windowLabel(Date.now(), s.ms);
   const expiresInSec = Math.ceil(s.ms / 1000) + 60;
 
+  // Unconditional $inc upsert first (no ceiling filter in the query — that
+  // races two concurrent upserts into an E11000 duplicate-key). After the
+  // increment, if the count is over the ceiling we compensate with a $inc
+  // -1 and deny. The single atomic write serializes concurrent requests, so
+  // the ceiling can't be overshot.
   const res = await QuotaWindow.findOneAndUpdate(
-    {
-      key,
-      kind: s.kind,
-      window,
-      count: { $lt: s.limit },
-    },
+    { key, kind: s.kind, window },
     {
       $inc: { count: 1 },
       $setOnInsert: { expiresAt: new Date(Date.now() + expiresInSec * 1000) },
     },
     { upsert: true, new: true }
   );
-  // Filter (count < limit) fails to match once the doc exists at the
-  // ceiling, so `res` is null — the reservation is denied atomically.
-  return res !== null;
+
+  if (res.count > s.limit) {
+    await QuotaWindow.updateOne(
+      { key, kind: s.kind, window },
+      { $inc: { count: -1 } }
+    ).catch(() => {});
+    return false;
+  }
+  return true;
 }
 
 export async function checkAndRecord(opts: {
