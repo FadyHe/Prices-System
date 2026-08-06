@@ -102,6 +102,7 @@ const ScrapeJobSchema = new Schema(
   {
     jobId: { type: String, required: true, unique: true, index: true },
     query: { type: String, required: true, trim: true },
+    normalizedQuery: { type: String, index: true },
     status: {
       type: String,
       enum: ['pending', 'running', 'complete', 'failed'],

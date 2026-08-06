@@ -41,14 +41,27 @@ export async function POST(req: Request) {
 
   await connectDB();
 
-  const existing = await SearchHistory.find({ userId }).select('query');
-  const existingQueries = new Set(
-    existing.map((e) => e.query.toLowerCase())
+  const existing = await SearchHistory.find({ userId }).select(
+    'query savedProducts'
   );
+  const existingQueries = new Set(existing.map((e) => e.query.toLowerCase()));
+  // Dedup by product URL so re-merging the same local history never
+  // duplicates saved products inside a single entry.
+  const existingUrls = new Set<string>();
+  for (const e of existing) {
+    for (const p of e.savedProducts ?? []) {
+      if (p?.url) existingUrls.add(p.url);
+    }
+  }
 
-  const fresh = entries.filter(
-    (e) => e.query && !existingQueries.has(e.query.toLowerCase())
-  );
+  const fresh = entries
+    .filter((e) => e.query && !existingQueries.has(e.query.toLowerCase()))
+    .map((e) => ({
+      ...e,
+      savedProducts: (e.savedProducts ?? []).filter(
+        (p) => p?.url && !existingUrls.has(p.url)
+      ),
+    }));
 
   if (fresh.length === 0) {
     return NextResponse.json({ merged: 0 });

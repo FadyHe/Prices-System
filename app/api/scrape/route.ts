@@ -8,7 +8,7 @@ import { resolveIdentity } from '@/lib/identity';
 import { connectDB } from '@/lib/db/mongodb';
 import { ScrapeJob } from '@/lib/db/models';
 import { triggerWorkflowDispatch } from '@/lib/github/dispatch';
-import { cacheGet, cacheSet, normalizeForCache } from '@/lib/search/cache';
+import { normalizeForCache } from '@/lib/search/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,11 +83,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Dedup identical recent searches against the DB (shared across all
+  // serverless instances, unlike a per-instance Map) to avoid fanning out
+  // duplicate repository_dispatch jobs within a short window.
   const cacheKey = normalizeForCache(query);
-  const cachedJobId = cacheGet<string>(`query:${cacheKey}`);
-  if (cachedJobId) {
+  await connectDB();
+  const recentJob = await ScrapeJob.findOne({
+    normalizedQuery: cacheKey,
+    status: { $in: ['pending', 'running'] },
+    createdAt: { $gt: new Date(Date.now() - 60_000) },
+  }).select('jobId');
+  if (recentJob?.jobId) {
     return Response.json({
-      jobId: cachedJobId,
+      jobId: recentJob.jobId,
       status: 'pending',
       cached: true,
       quota: { remaining: quota.remaining, limit: quota.limit },
@@ -95,17 +103,16 @@ export async function POST(req: Request) {
   }
 
   const jobId = newJobId();
-  cacheSet(`query:${cacheKey}`, jobId, 60_000);
 
   // Persist the job BEFORE dispatch so (a) a client polling
   // /scrape/status/[jobId] right after this never 404s, and (b) the
   // dispatch-failure path below has a real doc to update. A DB failure
   // must surface as an error, not a 200 referencing a job that doesn't exist.
   try {
-    await connectDB();
     await ScrapeJob.create({
       jobId,
       query,
+      normalizedQuery: cacheKey,
       status: 'pending',
       userId,
       ip,

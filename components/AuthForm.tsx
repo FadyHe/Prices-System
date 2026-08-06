@@ -15,9 +15,15 @@ interface AuthFormProps {
 }
 
 export default function AuthForm({ mode }: AuthFormProps) {
+  /** Reject off-site callbackUrl (open-redirect). Only allow same-site absolute paths: must start with '/' and not '//'. */
+  function safeCallback(raw: string | null): string {
+    if (raw && raw.startsWith('/') && !raw.startsWith('//')) return raw;
+    return '/';
+  }
+
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get('callbackUrl') ?? '/';
+  const callbackUrl = safeCallback(params.get('callbackUrl'));
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
