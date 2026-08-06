@@ -22,7 +22,13 @@ export async function scrapeJumia(
   try {
     await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
   } catch (err) {
-    console.warn('[Jumia] Product cards not found, extracting whatever is on page');
+    const dbg = await page.evaluate(() => ({
+      title: document.title,
+      url: location.href,
+      articleCnt: document.querySelectorAll('article.prd, article.-paxs').length,
+      bodyStart: document.body ? document.body.innerHTML.slice(0, 200) : '',
+    }));
+    console.warn('[Jumia] Product cards not found (10s).', JSON.stringify(dbg));
   }
 
   const products = await page.evaluate((max) => {
