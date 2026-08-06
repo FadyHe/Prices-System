@@ -84,6 +84,9 @@ async function runOne(
   let failure: SourceFailure | undefined;
   try {
     await applyStealth(page);
+    // Light per-site jitter so the three concurrent sites don't always hit
+    // their CDNs at the exact same instant (subtle anti-detection, cheap).
+    await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 800) + 200));
     try {
       const products = await withTimeout(fn(page, query, max), PER_SITE_TIMEOUT_MS, name);
       if (products.length === 0) {

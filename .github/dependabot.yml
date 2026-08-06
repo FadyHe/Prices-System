@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Main Next.js app (package.json / pnpm-lock.yaml)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    versioning-strategy: auto
+
+  # Standalone scraper-service (package.json / package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/scraper-service"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    versioning-strategy: auto

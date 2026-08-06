@@ -92,8 +92,12 @@ function Header() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { visible, scrolled } = useScrollDirection();
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // One coordinated open panel ('search' | 'menu' | null) so the search
+  // overlay and mobile menu can never both be open, and body scroll locks
+  // whenever either is.
+  const [panel, setPanel] = useState<'search' | 'menu' | null>(null);
+  const searchOpen = panel === 'search';
+  const mobileOpen = panel === 'menu';
   const [query, setQuery] = useState('');
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -103,22 +107,23 @@ function Header() {
     isAuthed && !bannerDismissed && !session?.user?.emailVerified;
 
   useKeyboardShortcut(() => {
-    setSearchOpen(true);
+    setPanel('search');
     requestAnimationFrame(() => inputRef.current?.focus());
   }, 'k');
 
+  // Lock body scroll while EITHER overlay is open (search or mobile menu).
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!panel) return;
     const original = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = original;
     };
-  }, [searchOpen]);
+  }, [panel]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- close mobile menu on route change
-    setMobileOpen(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close overlays on route change
+    setPanel(null);
   }, [pathname]);
 
   const isActive = (href: string) => {
@@ -132,14 +137,14 @@ function Header() {
     e.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) return;
-    setSearchOpen(false);
+    setPanel(null);
     setQuery('');
     router.push(`/search?q=${encodeURIComponent(trimmed)}`);
   };
 
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
-      setSearchOpen(false);
+      setPanel(null);
       setQuery('');
     }
   };
@@ -199,7 +204,7 @@ function Header() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSearchOpen(true);
+                    setPanel('search');
                     requestAnimationFrame(() => inputRef.current?.focus());
                   }}
                   aria-label="بحث سريع"
@@ -239,7 +244,7 @@ function Header() {
                   type="button"
                   aria-label={mobileOpen ? 'إغلاق القائمة' : 'فتح القائمة'}
                   aria-expanded={mobileOpen}
-                  onClick={() => setMobileOpen((v) => !v)}
+                  onClick={() => setPanel(panel === 'menu' ? null : 'menu')}
                   className="lg:hidden inline-flex items-center justify-center w-9 h-9 rounded-full bg-bg-card border border-[var(--paper-border-soft)] text-primary hover:border-deal/40 transition-colors shrink-0"
                 >
                   {mobileOpen ? <X size={18} /> : <Menu size={18} />}
@@ -264,7 +269,7 @@ function Header() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      onClick={() => setMobileOpen(false)}
+                      onClick={() => setPanel(null)}
                       className={cn(
                         'flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors whitespace-nowrap',
                         active
@@ -285,8 +290,7 @@ function Header() {
               <button
                 type="button"
                 onClick={() => {
-                  setMobileOpen(false);
-                  setSearchOpen(true);
+                  setPanel('search');
                   requestAnimationFrame(() => inputRef.current?.focus());
                 }}
                 className="btn btn-outline flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
@@ -296,7 +300,7 @@ function Header() {
               {!isAuthed ? (
                 <Link
                   href="/login"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => setPanel(null)}
                   className="btn btn-primary flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
                 >
                   <LogIn size={15} /> دخول
@@ -304,7 +308,7 @@ function Header() {
               ) : (
                 <Link
                   href="/search"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => setPanel(null)}
                   className="btn btn-primary flex-1 justify-center text-sm whitespace-nowrap gap-1.5"
                 >
                   <Sparkles size={15} /> ابدأ المقارنة
@@ -356,7 +360,7 @@ function Header() {
           className="fixed inset-0 z-[60] flex items-start justify-center pt-24 px-4 bg-[#2a241a]/55 backdrop-blur-sm animate-[fadeIn_150ms_ease-out]"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setSearchOpen(false);
+              setPanel(null);
               setQuery('');
             }
           }}
@@ -380,7 +384,7 @@ function Header() {
               <button
                 type="button"
                 onClick={() => {
-                  setSearchOpen(false);
+                  setPanel(null);
                   setQuery('');
                 }}
                 aria-label="إغلاق"
@@ -403,7 +407,7 @@ function Header() {
                   onClick={() => {
                     setQuery(s);
                     router.push(`/search?q=${encodeURIComponent(s)}`);
-                    setSearchOpen(false);
+                    setPanel(null);
                     setQuery('');
                   }}
                   className="pill text-xs whitespace-nowrap"

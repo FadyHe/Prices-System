@@ -54,3 +54,6 @@ jobs:
 
       - name: Type-check
         run: pnpm typecheck
+
+      - name: Audit dependencies
+        run: pnpm audit --prod || true

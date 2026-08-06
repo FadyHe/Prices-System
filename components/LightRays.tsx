@@ -121,6 +121,14 @@ const LightRays: React.FC<LightRaysProps> = ({
   useEffect(() => {
     if (!isVisible || !containerRef.current) return;
 
+    // Respect prefers-reduced-motion: skip the animation loop entirely.
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+
     if (cleanupFunctionRef.current) {
       cleanupFunctionRef.current();
       cleanupFunctionRef.current = null;
