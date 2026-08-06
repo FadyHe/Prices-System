@@ -8,12 +8,18 @@ import { resolveIdentity } from '@/lib/identity';
 import { connectDB } from '@/lib/db/mongodb';
 import { ScrapeJob } from '@/lib/db/models';
 import { triggerWorkflowDispatch } from '@/lib/github/dispatch';
+import { runAllScrapers as runInProcess } from '@/lib/scrape/run';
 import { normalizeForCache } from '@/lib/search/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_QUERY_LENGTH = 100;
+// In-process scraping is the default path: it needs no GitHub Actions
+// runner, so it works on localhost and production even while GH is
+// queuing/failing. Set SCRAPE_MODE=github to force the async GH Actions
+// path instead.
+const SCRAPE_MODE = process.env.SCRAPE_MODE ?? 'inprocess';
 
 function validateQuery(input: unknown): string | null {
   if (typeof input !== 'string') return null;
@@ -34,8 +40,9 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return Response.json({ error: 'invalid body' }, { status: 400 });
+    return Response.json({ error: 'invalid json' }, { status: 400 });
   }
+
   const query = validateQuery(body?.query);
   if (!query) {
     return Response.json(
@@ -70,10 +77,80 @@ export async function POST(req: Request) {
           reason: quota.reason,
         },
       },
-      { status: 429, headers: identity.newCookie ? { 'Set-Cookie': identity.newCookie } : undefined }
+      {
+        status: 429,
+        headers: identity.newCookie ? { 'Set-Cookie': identity.newCookie } : undefined,
+      }
     );
   }
 
+  const cacheKey = normalizeForCache(query);
+
+  // ── In-process path (default) ─────────────────────────────────────────
+  if (SCRAPE_MODE !== 'github') {
+    const jobId = newJobId();
+    try {
+      const result = await runInProcess(query);
+
+      try {
+        await connectDB();
+        await ScrapeJob.create({
+          jobId,
+          query,
+          normalizedQuery: cacheKey,
+          status: 'complete',
+          userId,
+          ip,
+          plan,
+          products: result.products,
+          totalScraped: result.products.length,
+          count: result.products.length,
+          failures: result.failures,
+          completedAt: new Date(),
+        });
+      } catch (err) {
+        console.error('[scrape] persist failed', err);
+        // Don't fail the user just because history persistence failed.
+      }
+
+      audit({
+        userId,
+        ip,
+        action: 'scrape.success',
+        query,
+        meta: { plan, jobId, mode: 'inprocess' },
+      }).catch(() => {});
+
+      return Response.json(
+        {
+          jobId,
+          status: 'complete',
+          products: result.products,
+          totalScraped: result.products.length,
+          count: result.products.length,
+          failures: result.failures,
+          elapsedMs: result.elapsedMs,
+          quota: { remaining: quota.remaining, limit: quota.limit },
+        },
+        { headers: identity.newCookie ? { 'Set-Cookie': identity.newCookie } : undefined }
+      );
+    } catch (err) {
+      console.error('[scrape] in-process failed', err);
+      audit({
+        userId,
+        ip,
+        action: 'scrape.failed',
+        query,
+        meta: { plan, mode: 'inprocess', error: err instanceof Error ? err.message : String(err) },
+      }).catch(() => {});
+      return Response.json(
+        { error: 'فشل البحث. حاول مرة أخرى.' },
+        { status: 500 }
+      );
+    }
+  }
+
+  // ── GitHub Actions path (SCRAPE_MODE=github) ──────────────────────────
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPO;
   if (!token || !repo) {
@@ -83,32 +160,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // Dedup identical recent searches against the DB (shared across all
-  // serverless instances, unlike a per-instance Map) to avoid fanning out
-  // duplicate repository_dispatch jobs within a short window.
-  const cacheKey = normalizeForCache(query);
-  await connectDB();
-  const recentJob = await ScrapeJob.findOne({
-    normalizedQuery: cacheKey,
-    status: { $in: ['pending', 'running'] },
-    createdAt: { $gt: new Date(Date.now() - 60_000) },
-  }).select('jobId');
-  if (recentJob?.jobId) {
-    return Response.json({
-      jobId: recentJob.jobId,
-      status: 'pending',
-      cached: true,
-      quota: { remaining: quota.remaining, limit: quota.limit },
-    });
-  }
-
   const jobId = newJobId();
 
-  // Persist the job BEFORE dispatch so (a) a client polling
-  // /scrape/status/[jobId] right after this never 404s, and (b) the
-  // dispatch-failure path below has a real doc to update. A DB failure
-  // must surface as an error, not a 200 referencing a job that doesn't exist.
   try {
+    await connectDB();
     await ScrapeJob.create({
       jobId,
       query,
@@ -120,10 +175,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error('[scrape] persist failed', err);
-    return Response.json(
-      { error: 'failed to create scrape job' },
-      { status: 500 }
-    );
+    return Response.json({ error: 'failed to create scrape job' }, { status: 500 });
   }
 
   try {
@@ -137,18 +189,9 @@ export async function POST(req: Request) {
     console.error('[scrape] dispatch failed', err);
     ScrapeJob.updateOne(
       { jobId },
-      {
-        $set: {
-          status: 'failed',
-          error: 'dispatch_failed',
-          completedAt: new Date(),
-        },
-      }
+      { $set: { status: 'failed', error: 'dispatch_failed', completedAt: new Date() } }
     ).catch(() => {});
-    return Response.json(
-      { error: 'failed to start scraper job' },
-      { status: 502 }
-    );
+    return Response.json({ error: 'failed to start scraper job' }, { status: 502 });
   }
 
   audit({
