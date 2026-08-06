@@ -18,17 +18,22 @@ export async function scrapeJumia(
     throw err;
   }
 
-  // Wait for product cards before extracting (products load after domcontentloaded).
-  try {
-    await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
-  } catch (err) {
-    const dbg = await page.evaluate(() => ({
-      title: document.title,
-      url: location.href,
-      articleCnt: document.querySelectorAll('article.prd, article.-paxs').length,
-      bodyStart: document.body ? document.body.innerHTML.slice(0, 200) : '',
-    }));
-    console.warn('[Jumia] Product cards not found (10s).', JSON.stringify(dbg));
+  // Wait for product cards. Jumia sometimes serves a bot-check interstitial ("لحظة")
+  // that auto-solves after a few seconds; retry with a wait between attempts.
+  let jumiaCardsFound = false;
+  for (let attempt = 1; attempt <= 4 && !jumiaCardsFound; attempt++) {
+    try {
+      await page.waitForSelector('article.prd, article.-paxs', { timeout: 10000 });
+      jumiaCardsFound = true;
+    } catch (err) {
+      const dbg = await page.evaluate(() => ({
+        title: document.title,
+        url: location.href,
+        articleCnt: document.querySelectorAll('article.prd, article.-paxs').length,
+      }));
+      console.warn(`[Jumia] Product cards not found (attempt ${attempt}). title=${dbg.title} articles=${dbg.articleCnt} url=${dbg.url}`);
+      if (attempt < 4) await new Promise((r) => setTimeout(r, 5000));
+    }
   }
 
   const products = await page.evaluate((max) => {
