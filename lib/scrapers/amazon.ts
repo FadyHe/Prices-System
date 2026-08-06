@@ -58,13 +58,19 @@ export async function scrapeAmazon(
 
     console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
 
-    try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      console.log(`[Amazon] Page ${currentPage} loaded`);
-    } catch (err) {
-      console.error('[Amazon] Navigation failed:', err);
-      break;
+    // Retry transient navigation failures (ERR_INVALID_RESPONSE is intermittent anti-bot).
+    let loaded = false;
+    for (let attempt = 1; attempt <= 3 && !loaded; attempt++) {
+      try {
+        await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+        console.log(`[Amazon] Page ${currentPage} loaded (attempt ${attempt})`);
+        loaded = true;
+      } catch (err) {
+        console.error(`[Amazon] Navigation failed (attempt ${attempt}):`, err instanceof Error ? err.message : err);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * attempt));
+      }
     }
+    if (!loaded) break;
 
     // --- CAPTCHA detection ---
     const captcha = await isCaptchaPage(page);

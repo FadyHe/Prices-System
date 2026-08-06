@@ -7,7 +7,7 @@ export async function scrapeJumia(
   maxProducts = 15
 ): Promise<Product[]> {
 
-  const url = `https://www.jumia.com.eg/catalog/?q=${encodeURIComponent(query)}`;
+  const url = `https://www.jumia.com.eg/ar/catalog/?q=${encodeURIComponent(query)}`;
   console.log('[Jumia] Navigating to:', url);
 
   try {
@@ -58,7 +58,7 @@ export async function scrapeJumia(
 
     return items.map(item => {
       const linkEl = item.querySelector('a.core, a.link');
-      const url = linkEl ? 'https://www.jumia.com.eg' + linkEl.getAttribute('href') : '';
+      const url = linkEl ? (linkEl.getAttribute('href').startsWith('http') ? linkEl.getAttribute('href') : 'https://www.jumia.com.eg' + linkEl.getAttribute('href')) : '';
 
       const name = item.querySelector('h3.name, div.name')?.textContent?.trim() || 'Unknown';
 
