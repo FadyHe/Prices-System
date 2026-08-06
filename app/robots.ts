@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/search-test', '/test'],
+        disallow: ['/api/'],
       },
     ],
     sitemap: 'https://qarinha.app/sitemap.xml',

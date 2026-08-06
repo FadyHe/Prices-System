@@ -92,13 +92,13 @@ export default function UserMenu() {
               سجل البحث
             </Link>
             <Link
-              href="/profile"
+              href="/history"
               onClick={() => setOpen(false)}
               role="menuitem"
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-secondary hover:bg-deal/5 hover:text-deal transition-colors"
             >
               <UserIcon size={16} />
-              الملف الشخصي
+              حسابي
             </Link>
           </div>
           <div className="border-t border-[var(--paper-border-soft)] py-1">
