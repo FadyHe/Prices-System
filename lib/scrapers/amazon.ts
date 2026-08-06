@@ -1,5 +1,5 @@
 import { Page } from 'puppeteer';
-import { Product } from '../types';
+import { Product } from '@/lib/types';
 import path from 'path';
 
 const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
@@ -24,16 +24,37 @@ async function autoScroll(page: Page) {
 }
 
 /** Check if Amazon returned a CAPTCHA page instead of results */
-async function isCaptchaPage(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    return !!(
-      document.querySelector('#captchacharacters') ||
-      document.querySelector('form[action*="validateCaptcha"]') ||
-      document.querySelector('input#captchacharacters') ||
-      document.title.toLowerCase().includes('robot check') ||
-      document.title.toLowerCase().includes('sorry')
-    );
-  });
+export async function amazonCaptchaDetected(page: Page): Promise<boolean> {
+  try {
+    return await page.evaluate(() => {
+      return !!(
+        document.querySelector('#captchacharacters') ||
+        document.querySelector('form[action*="validateCaptcha"]') ||
+        document.querySelector('input#captchacharacters') ||
+        document.title.toLowerCase().includes('robot check') ||
+        document.title.toLowerCase().includes('sorry')
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+/** Store the last CAPTCHA verdict on the current page (consumed by the runner). */
+export async function markAmazonCaptcha(page: Page): Promise<void> {
+  try {
+    await page.evaluate(() => {
+      (window as unknown as { __amazonCaptcha?: boolean }).__amazonCaptcha = !!(
+        document.querySelector('#captchacharacters') ||
+        document.querySelector('form[action*="validateCaptcha"]') ||
+        document.querySelector('input#captchacharacters') ||
+        document.title.toLowerCase().includes('robot check') ||
+        document.title.toLowerCase().includes('sorry')
+      );
+    });
+  } catch {
+    /* page may be closed already */
+  }
 }
 
 /** Small random delay to appear more human */
@@ -47,8 +68,7 @@ export async function scrapeAmazon(
   query: string,
   maxProducts = 15
 ): Promise<Product[]> {
-
-const allProducts: Product[] = [];
+  const allProducts: Product[] = [];
   // Default to a single results page; only fetch page 2 when page 1 came back thin
   // (fewer than ADAPTIVE_PAGE2_THRESHOLD raw products) so short-tail queries still
   // have a chance to fill up to MAX_PER_SITE.
@@ -63,11 +83,11 @@ const allProducts: Product[] = [];
 
     console.log(`[Amazon] Navigating to page ${currentPage}:`, url);
 
-// Retry transient navigation failures (ERR_INVALID_RESPONSE is intermittent anti-bot).
+    // Retry transient navigation failures (ERR_INVALID_RESPONSE is intermittent anti-bot).
     let loaded = false;
     for (let attempt = 1; attempt <= 3 && !loaded; attempt++) {
       try {
-        await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+        await page.goto(url, { waitUntil: 'load', timeout: 20000 });
         console.log(`[Amazon] Page ${currentPage} loaded (attempt ${attempt})`);
         loaded = true;
       } catch (err) {
@@ -77,7 +97,7 @@ const allProducts: Product[] = [];
     }
     if (!loaded) break;
 
-    const captcha = await isCaptchaPage(page);
+    const captcha = await amazonCaptchaDetected(page);
     if (captcha) {
       const title = await page.title();
       console.warn(`[Amazon] CAPTCHA detected! Page title: "${title}"`);
@@ -88,6 +108,7 @@ const allProducts: Product[] = [];
         console.log(`[Amazon] Debug screenshot saved: ${ssPath}`);
       } catch {}
 
+      await markAmazonCaptcha(page);
       break;
     }
 
@@ -101,7 +122,7 @@ const allProducts: Product[] = [];
     let selectorFound = false;
     for (const selector of selectors) {
       try {
-        await page.waitForSelector(selector, { timeout: 10000 });
+        await page.waitForSelector(selector, { timeout: 8000 });
         selectorFound = true;
         break;
       } catch {}
@@ -120,8 +141,8 @@ const allProducts: Product[] = [];
       break;
     }
 
-await autoScroll(page);
-     await new Promise(r => setTimeout(r, 500));
+    await autoScroll(page);
+    await new Promise(r => setTimeout(r, 500));
 
     const products = await page.evaluate((max, debug) => {
       function convertArabicToWestern(str: string): string {

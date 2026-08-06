@@ -1,7 +1,16 @@
 import { Page } from 'puppeteer';
-import { Product } from '../types';
+import { Product } from '@/lib/types';
 
 const DEBUG_SCRAPE = !!process.env.DEBUG_SCRAPE;
+
+// Noon blocks headless Chrome: the DOM may commit but the page often never
+// settles to `domcontentloaded`, so goto frequently only returns via timeout.
+// We still want a chance at client-rendered prices, so goto is capped SHORT
+// and then we wait for a product selector. If the selector never appears we
+// return what we can (even name+url without price) instead of blocking the
+// shared run for the full site budget.
+const NAV_TIMEOUT_MS = 8_000;
+const SELECTOR_TIMEOUT_MS = 10_000;
 
 export async function scrapeNoon(
   page: Page,
@@ -12,15 +21,15 @@ export async function scrapeNoon(
   const url = `https://www.noon.com/egypt-ar/search?q=${encodeURIComponent(query)}`;
   console.log('[Noon] Navigating to:', url);
 
+  let navFailed = false;
   try {
-    // Noon actively blocks headless Chromium: the page never settles to
-    // domcontentloaded, so goto only returns via timeout. Cap it short and
-    // skip gracefully — low-value to hold the whole run for one site.
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    console.log('[Noon] Page loaded');
+    // waitUntil domcontentloaded; if it never fires we get a timeout rejection,
+    // which is fine — the DOM may still be committed and usable below.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+    console.log('[Noon] Page loaded (domcontentloaded)');
   } catch (err) {
-    console.error('[Noon] Navigation failed:', err);
-    return [];
+    console.warn('[Noon] Navigation timeout/error (continuing with committed DOM):', err instanceof Error ? err.message : err);
+    navFailed = true;
   }
 
   const selectors = [
@@ -31,7 +40,7 @@ export async function scrapeNoon(
   let selectorFound = false;
   for (const selector of selectors) {
     try {
-      await page.waitForSelector(selector, { timeout: 6000 });
+      await page.waitForSelector(selector, { timeout: SELECTOR_TIMEOUT_MS });
       console.log(`[Noon] Found products with selector: ${selector}`);
       selectorFound = true;
       break;
@@ -120,6 +129,6 @@ export async function scrapeNoon(
     return results;
   }, maxProducts, DEBUG_SCRAPE);
 
-  console.log(`[Noon] Successfully extracted ${products.length} products`);
+  console.log(`[Noon] Successfully extracted ${products.length} products (navFailed=${navFailed})`);
   return products as unknown as Product[];
 }
