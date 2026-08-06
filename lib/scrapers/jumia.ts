@@ -20,14 +20,13 @@ export async function scrapeJumia(
     return products;
   }
 
-  // 403 from a datacenter IP means Jumia's edge blocks this caller; the
-  // browser fallback hits the same "لحظة" interstitial and only wastes time.
-  if (status === 403) {
-    console.warn('[Jumia] fetch 403 (IP blocked) — skipping browser DOM fallback');
-    return [];
-  }
-
-  console.log('[Jumia] fetch returned nothing, falling back to browser DOM');
+  // 403 from the datacenter IP means Jumia's edge blocked the plain fetch.
+  // Don't give up — the Puppeteer browser (serverless Chromium, same egress
+  // but different TLS/client-fingerprint) may still render the catalog. Try
+  // it; worst case it returns 0 and telemetry records 'empty'.
+  console.log(
+    `[Jumia] fetch returned nothing (status=${status}), falling back to browser DOM`
+  );
   return scrapeViaPuppeteer(page, query, maxProducts);
 }
 
