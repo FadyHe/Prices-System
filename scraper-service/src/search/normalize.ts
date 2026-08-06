@@ -1,14 +1,5 @@
 import { STOPWORDS } from "./stopwords";
 
-const ARABIC_LETTER_VARIANTS: Record<string, string> = {
-  "أ": "ا",
-  "إ": "ا",
-  "آ": "ا",
-  "ٱ": "ا",
-  "ى": "ي",
-  "ة": "ه",
-};
-
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 const WESTERN_DIGITS = "0123456789";
 
