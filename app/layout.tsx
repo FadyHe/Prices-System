@@ -146,7 +146,7 @@ export default function RootLayout({
         </Providers>
       </body>
       <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1431014878627404"
-      crossorigin="anonymous"></script>
+      crossOrigin="anonymous"></script>
     </html>
   )
 }
